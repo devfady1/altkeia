@@ -15,8 +15,7 @@
         <div class="kitchen-card-header">
             <div>
                 <strong>{{ order.table.display_name }}</strong>
-                <span class="text-muted" style="font-size:0.8rem;margin-right:8px;">{{ order.created_at|time:"H:i"
-                    }}</span>
+                <span class="text-muted" style="font-size:0.8rem;margin-right:8px;">{{ order.created_at|time:"H:i" }}</span>
             </div>
             <span class="badge {% if order.status == 'confirmed' %}badge-info{% else %}badge-warning{% endif %}">
                 {{ order.get_status_display }}

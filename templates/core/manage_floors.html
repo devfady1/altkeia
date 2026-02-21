@@ -29,8 +29,7 @@
             <tr>
                 <td class="fw-bold">{{ floor.name }}</td>
                 <td>{{ floor.order }}</td>
-                <td><span class="badge {% if floor.is_active %}badge-success{% else %}badge-danger{% endif %}">{{
-                        floor.is_active|yesno:"نشط,معطل" }}</span></td>
+                <td><span class="badge {% if floor.is_active %}badge-success{% else %}badge-danger{% endif %}">{{ floor.is_active|yesno:"نشط,معطل" }}</span></td>
                 <td>
                     <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
                             value="toggle"><input type="hidden" name="id" value="{{ floor.pk }}"><button

@@ -19,10 +19,8 @@
             <div class="order-item-notes">{{ entry.requested_hours }} ساعة</div>
         </div>
         <div>
-            <form method="post" action="{% url 'activate_queue' entry.pk %}" style="display:inline;">{% csrf_token
-                %}<button class="btn btn-success btn-sm">▶ تشغيل</button></form>
-            <form method="post" action="{% url 'cancel_queue' entry.pk %}" style="display:inline;">{% csrf_token
-                %}<button class="btn btn-danger btn-sm">✕</button></form>
+            <form method="post" action="{% url 'activate_queue' entry.pk %}" style="display:inline;">{% csrf_token %}<button class="btn btn-success btn-sm">▶ تشغيل</button></form>
+            <form method="post" action="{% url 'cancel_queue' entry.pk %}" style="display:inline;">{% csrf_token %}<button class="btn btn-danger btn-sm">✕</button></form>
         </div>
     </div>
     {% empty %}

@@ -49,8 +49,7 @@
             <tr>
                 <td class="fw-bold">{{ device.name }}</td>
                 <td><span
-                        class="badge {% if device.status == 'available' %}badge-success{% elif device.status == 'busy' %}badge-danger{% else %}badge-warning{% endif %}">{{
-                        device.get_status_display }}</span></td>
+                        class="badge {% if device.status == 'available' %}badge-success{% elif device.status == 'busy' %}badge-danger{% else %}badge-warning{% endif %}">{{ device.get_status_display }}</span></td>
                 <td>
                     <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">{% csrf_token %}<input
                             type="hidden" name="action" value="delete_device"><input type="hidden" name="id"

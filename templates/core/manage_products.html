@@ -54,8 +54,7 @@
             <tr>
                 <td class="fw-bold">{{ product.name }}</td>
                 <td>{{ product.price }} ج.م</td>
-                <td><span class="badge {% if product.is_available %}badge-success{% else %}badge-danger{% endif %}">{{
-                        product.is_available|yesno:"متاح,غير متاح" }}</span></td>
+                <td><span class="badge {% if product.is_available %}badge-success{% else %}badge-danger{% endif %}">{{ product.is_available|yesno:"متاح,غير متاح" }}</span></td>
                 <td>
                     <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
                             value="toggle_product"><input type="hidden" name="id" value="{{ product.pk }}"><button

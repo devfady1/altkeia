@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}تفاصيل الجلسة{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">جلسة #{{ session.pk }} - {{ session.primary_table.display_name }}</h1>
+        <p class="page-subtitle">{{ session.get_status_display }} · {{ session.duration }}</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-ghost">← العودة للوحة التحكم</a>
+</div>
+
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+    <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div>
+            <div class="stat-value">{{ session.guest_count }}</div>
+            <div class="stat-label">ضيوف</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">📋</div>
+        <div>
+            <div class="stat-value">{{ session.orders.count }}</div>
+            <div class="stat-label">طلبات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">💰</div>
+        <div>
+            <div class="stat-value">{{ session.total_amount }} ج.م</div>
+            <div class="stat-label">الإجمالي</div>
+        </div>
+    </div>
+</div>
+
+<!-- Merged Tables -->
+{% if session.tables.count > 1 %}
+<div class="card mb-2">
+    <h3 class="card-title mb-1">🔗 الطاولات المدمجة</h3>
+    <div class="d-flex gap-1" style="gap:8px;flex-wrap:wrap;">
+        {% for table in session.tables.all %}
+        <span class="badge badge-info">{{ table.display_name }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Orders -->
+<div class="card mb-2">
+    <h3 class="card-title mb-2">📋 الطلبات</h3>
+    {% for order in session.orders.all %}
+    <div style="border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;">
+        <div class="d-flex justify-between align-center mb-1">
+            <div>
+                <span class="fw-bold">طلب #{{ order.pk }}</span>
+                <span class="text-muted" style="font-size:0.8rem;margin-right:8px;">{{ order.created_at|time:"H:i"
+                    }}</span>
+            </div>
+            <span class="badge" style="background:{{ order.status_color }}20;color:{{ order.status_color }}">{{
+                order.get_status_display }}</span>
+        </div>
+        {% for item in order.items.all %}
+        <div class="order-item">
+            <div class="order-item-qty">{{ item.quantity }}</div>
+            <div class="order-item-info">
+                <div class="order-item-name">{{ item.product.name }}</div>
+                {% if item.notes %}
+                <div class="order-item-notes">{{ item.notes }}</div>
+                {% endif %}
+            </div>
+            <div class="order-item-price">{{ item.subtotal }} ج.م</div>
+        </div>
+        {% endfor %}
+        <div class="d-flex justify-between mt-1" style="padding-top:8px;border-top:1px solid var(--border-color);">
+            <span class="text-muted">إجمالي الطلب</span>
+            <span class="fw-bold">{{ order.total }} ج.م</span>
+        </div>
+    </div>
+    {% empty %}
+    <p class="text-muted text-center">لا توجد طلبات بعد</p>
+    {% endfor %}
+</div>
+
+<!-- Activities -->
+{% if session.activity_sessions.exists %}
+<div class="card mb-2">
+    <h3 class="card-title mb-2">🎮 الأنشطة</h3>
+    {% for act in session.activity_sessions.all %}
+    <div class="order-item">
+        <div class="order-item-info">
+            <div class="order-item-name">{{ act.device.name }}</div>
+            <div class="order-item-notes">{{ act.device.activity_type.name }} · {{ act.duration_display }}</div>
+        </div>
+        <div>
+            {% if act.ended_at %}
+            <span class="fw-bold text-success">{{ act.total_price }} ج.م</span>
+            {% else %}
+            <span class="fw-bold text-warning">{{ act.running_cost }} ج.م (جارٍ)</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Total & Actions -->
+<div class="card"
+    style="background:linear-gradient(135deg,rgba(233,69,96,0.1),rgba(233,69,96,0.05));border-color:rgba(233,69,96,0.3);">
+    <div class="d-flex justify-between mb-1">
+        <span>إجمالي الطلبات</span><span>{{ session.total_orders }} ج.م</span>
+    </div>
+    <div class="d-flex justify-between mb-1">
+        <span>إجمالي الأنشطة</span><span>{{ session.total_activities }} ج.م</span>
+    </div>
+    <div style="border-top:1px solid var(--border-color);padding-top:10px;margin-top:8px;"
+        class="d-flex justify-between">
+        <span class="fw-bold" style="font-size:1.3rem;">الإجمالي</span>
+        <span class="fw-bold text-success" style="font-size:1.3rem;">{{ session.total_amount }} ج.م</span>
+    </div>
+</div>
+
+{% if session.status != 'closed' %}
+<div class="d-flex gap-1" style="gap:12px;margin-top:16px;">
+    <form method="post" action="{% url 'close_session' session.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-success btn-lg">💰 دفع وإغلاق</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

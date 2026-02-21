@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}الأنشطة{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🎮 الأنشطة والأجهزة</h1>
+</div>
+
+{% for at in activity_types %}
+<div class="card mb-2">
+    <div class="card-header">
+        <h3 class="card-title">{{ at.icon }} {{ at.name }}
+            <span class="text-muted" style="font-size:0.85rem;">({{ at.price_per_hour }} ج.م/ساعة)</span>
+        </h3>
+    </div>
+    <div class="kitchen-grid" style="padding:0;">
+        {% for device in at.devices.all %}
+        <div class="kitchen-card" style="margin:0;">
+            <div class="kitchen-card-header">
+                <strong>{{ device.name }}</strong>
+                <span class="badge {% if device.status == 'available' %}badge-success{% elif device.status == 'busy' %}badge-danger{% else %}badge-warning{% endif %}">
+                    {{ device.get_status_display }}
+                </span>
+            </div>
+            <div class="kitchen-card-body" style="padding:12px;">
+                {% if device.status == 'busy' %}
+                    {% with active_session=device.activity_sessions.filter_active %}
+                    {% for act in device.activity_sessions.all %}
+                        {% if not act.ended_at %}
+                        <div class="d-flex justify-between">
+                            <span class="text-muted">⏱ {{ act.duration_display }}</span>
+                            <span class="fw-bold text-success">{{ act.running_cost }} ج.م</span>
+                        </div>
+                        <div class="text-muted" style="font-size:0.8rem;margin-top:4px;">
+                            {{ act.session.primary_table.display_name }}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                    {% endwith %}
+                {% else %}
+                <div class="text-center text-muted" style="padding:8px;">متاح للاستخدام</div>
+                {% endif %}
+            </div>
+            {% if device.status == 'busy' %}
+            <div class="kitchen-card-footer">
+                {% for act in device.activity_sessions.all %}
+                    {% if not act.ended_at %}
+                    <form method="post" action="{% url 'end_activity' act.pk %}" style="width:100%;">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm btn-block">⏹ إنهاء النشاط</button>
+                    </form>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);">
+            لا توجد أجهزة
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% empty %}
+<div style="text-align:center;padding:60px;color:var(--text-muted);">
+    <div style="font-size:3rem;margin-bottom:12px;">🎮</div>
+    <p>لا توجد أنشطة. <a href="{% url 'manage_devices' %}" style="color:var(--accent-primary);">أضف أنشطة وأجهزة</a></p>
+</div>
+{% endfor %}
+{% endblock %}

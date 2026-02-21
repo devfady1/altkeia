@@ -43,8 +43,7 @@
                 <td>{{ emp.get_full_name }}</td>
                 <td><span class="badge badge-info">{{ emp.get_role_display }}</span></td>
                 <td>{{ emp.phone|default:"-" }}</td>
-                <td><span class="badge {% if emp.is_active_employee %}badge-success{% else %}badge-danger{% endif %}">{{
-                        emp.is_active_employee|yesno:"نشط,معطل" }}</span></td>
+                <td><span class="badge {% if emp.is_active_employee %}badge-success{% else %}badge-danger{% endif %}">{{ emp.is_active_employee|yesno:"نشط,معطل" }}</span></td>
                 <td>
                     {% if emp.role != 'owner' %}
                     <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
