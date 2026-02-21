@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}المطبخ{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">🍳 المطبخ</h1>
+        <p class="page-subtitle">الطلبات المؤكدة وقيد التحضير</p>
+    </div>
+    <button class="btn btn-ghost" onclick="refreshKitchen()">🔄 تحديث</button>
+</div>
+
+<div class="kitchen-grid" id="kitchenGrid">
+    {% for order in orders %}
+    <div class="kitchen-card {% if order.status == 'preparing' %}preparing{% endif %} fade-in">
+        <div class="kitchen-card-header">
+            <div>
+                <strong>{{ order.table.display_name }}</strong>
+                <span class="text-muted" style="font-size:0.8rem;margin-right:8px;">{{ order.created_at|time:"H:i"
+                    }}</span>
+            </div>
+            <span class="badge {% if order.status == 'confirmed' %}badge-info{% else %}badge-warning{% endif %}">
+                {{ order.get_status_display }}
+            </span>
+        </div>
+        <div class="kitchen-card-body">
+            {% for item in order.items.all %}
+            <div class="kitchen-item">
+                <div>
+                    <span class="fw-bold">{{ item.product.name }}</span>
+                    {% if item.notes %}
+                    <br><span class="text-muted" style="font-size:0.78rem;">{{ item.notes }}</span>
+                    {% endif %}
+                </div>
+                <div class="order-item-qty">{{ item.quantity }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="kitchen-card-footer">
+            {% if order.status == 'confirmed' %}
+            <button class="btn btn-warning btn-sm btn-block" onclick="updateOrderStatus({{ order.pk }}, 'preparing')">
+                🔥 بدء التحضير
+            </button>
+            {% elif order.status == 'preparing' %}
+            <button class="btn btn-success btn-sm btn-block" onclick="updateOrderStatus({{ order.pk }}, 'ready')">
+                ✅ جاهز
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);">
+        <div style="font-size:4rem;margin-bottom:16px;">👨‍🍳</div>
+        <h3>لا توجد طلبات حالياً</h3>
+        <p>الطلبات المؤكدة ستظهر هنا تلقائياً</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function updateOrderStatus(orderId, newStatus) {
+        const result = await apiPost(`/api/orders/${orderId}/status/`, { status: newStatus });
+        if (result.success) {
+            showToast('تم التحديث');
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast(result.error || 'خطأ', 'error');
+        }
+    }
+
+    function refreshKitchen() { location.reload(); }
+
+    // Auto refresh every 15s
+    setInterval(() => location.reload(), 15000);
+</script>
+{% endblock %}

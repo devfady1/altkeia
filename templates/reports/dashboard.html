@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}التقارير{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">📊 التقارير</h1>
+        <p class="page-subtitle">{{ today|date:"l j F Y" }}</p>
+    </div>
+    <div>
+        <a href="{% url 'daily_report' %}" class="btn btn-ghost btn-sm">📅 تقرير يومي</a>
+        <a href="{% url 'monthly_report' %}" class="btn btn-ghost btn-sm">📆 تقرير شهري</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">💰</div>
+        <div>
+            <div class="stat-value">{{ today_revenue }} ج.م</div>
+            <div class="stat-label">إيرادات اليوم</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">🪑</div>
+        <div>
+            <div class="stat-value">{{ today_sessions_count }}</div>
+            <div class="stat-label">جلسات اليوم</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">📋</div>
+        <div>
+            <div class="stat-value">{{ today_orders_count }}</div>
+            <div class="stat-label">طلبات اليوم</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">📆</div>
+        <div>
+            <div class="stat-value">{{ month_revenue }} ج.م</div>
+            <div class="stat-label">إيرادات الشهر</div>
+        </div>
+    </div>
+</div>
+
+<!-- Week Chart -->
+<div class="report-chart">
+    <h3 class="card-title mb-2">إيرادات آخر 7 أيام</h3>
+    <div class="chart-bars">
+        {% for day in week_data %}
+        <div class="chart-bar-wrapper">
+            <div class="chart-value">{{ day.revenue|floatformat:0 }}</div>
+            <div class="chart-bar"
+                style="height: {% if day.revenue > 0 %}{{ day.revenue|floatformat:0 }}{% else %}4{% endif %}px; max-height: 180px;">
+            </div>
+            <div class="chart-label">{{ day.day_name }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

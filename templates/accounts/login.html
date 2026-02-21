@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - نظام الكافيه</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-card fade-in">
+            <div class="login-logo">
+                <h1>☕ كافيه</h1>
+                <p>نظام إدارة الكافيه</p>
+            </div>
+            {% if form.errors %}
+            <div
+                style="background:var(--danger-bg);color:var(--danger);padding:12px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:0.9rem;text-align:center;">
+                اسم المستخدم أو كلمة المرور غير صحيحة
+            </div>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">اسم المستخدم</label>
+                    <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم" required
+                        autofocus>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">كلمة المرور</label>
+                    <input type="password" name="password" class="form-control" placeholder="أدخل كلمة المرور" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:8px;">
+                    دخول
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+
+</html>

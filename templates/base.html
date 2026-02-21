@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}نظام إدارة الكافيه{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block body %}
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1>☕ كافيه</h1>
+                <div class="subtitle">نظام الإدارة</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <span class="icon">🏠</span>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="{% url 'kitchen' %}" class="nav-item {% if request.resolver_match.url_name == 'kitchen' %}active{% endif %}">
+                    <span class="icon">🍳</span>
+                    <span>المطبخ</span>
+                </a>
+                <a href="{% url 'order_list' %}" class="nav-item {% if request.resolver_match.url_name == 'order_list' %}active{% endif %}">
+                    <span class="icon">📋</span>
+                    <span>الطلبات</span>
+                </a>
+                <a href="{% url 'queue_list' %}" class="nav-item {% if request.resolver_match.url_name == 'queue_list' %}active{% endif %}">
+                    <span class="icon">⏳</span>
+                    <span>الطابور</span>
+                </a>
+                {% if request.user.is_owner or request.user.is_manager %}
+                <a href="{% url 'reports' %}" class="nav-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+                    <span class="icon">📊</span>
+                    <span>التقارير</span>
+                </a>
+                <a href="{% url 'manage' %}" class="nav-item {% if 'manage' in request.path %}active{% endif %}">
+                    <span class="icon">⚙️</span>
+                    <span>الإدارة</span>
+                </a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">{{ request.user.first_name|truncatechars:1 }}</div>
+                    <div>
+                        <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                        <div class="user-role">{{ request.user.get_role_display }}</div>
+                    </div>
+                </div>
+                <div class="sidebar-actions">
+                    <button class="theme-toggle" onclick="toggleTheme()" title="تبديل المظهر">
+                        <span class="icon" id="themeIcon">🌙</span>
+                        <span id="themeLabel">الوضع الفاتح</span>
+                    </button>
+                    <form method="post" action="{% url 'logout' %}" style="flex:1;margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="nav-item" style="color:var(--danger);width:100%;border:none;background:none;font-family:var(--font);margin:0;">
+                            <span class="icon">🚪</span>
+                            <span>خروج</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% endblock %}
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    // ===== Theme Toggle =====
+    function getTheme() {
+        return localStorage.getItem('cafe-theme') || 'dark';
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        const icon = document.getElementById('themeIcon');
+        const label = document.getElementById('themeLabel');
+        if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+        if (label) label.textContent = theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الغامق';
+    }
+
+    function toggleTheme() {
+        const current = getTheme();
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('cafe-theme', next);
+        applyTheme(next);
+    }
+
+    // Apply saved theme on load
+    applyTheme(getTheme());
+
+    // ===== Toast =====
+    function showToast(message, type='success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ===== CSRF & API Helpers =====
+    function getCookie(name) {
+        let val = null;
+        document.cookie.split(';').forEach(c => {
+            c = c.trim();
+            if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+        });
+        return val;
+    }
+
+    const csrfToken = getCookie('csrftoken');
+
+    async function apiPost(url, data={}) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    }
+
+    async function apiGet(url) {
+        const res = await fetch(url);
+        return res.json();
+    }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

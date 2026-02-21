@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}تقرير شهري{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">📆 تقرير شهر {{ month }}/{{ year }}</h1>
+</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">💰</div>
+        <div>
+            <div class="stat-value">{{ total_revenue }} ج.م</div>
+            <div class="stat-label">إجمالي الإيرادات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">🪑</div>
+        <div>
+            <div class="stat-value">{{ sessions_count }}</div>
+            <div class="stat-label">إجمالي الجلسات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">💳</div>
+        <div>
+            <div class="stat-value">{{ payments_count }}</div>
+            <div class="stat-label">عمليات الدفع</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

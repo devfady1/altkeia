@@ -1,0 +1,585 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة التحكم - الكافيه{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">لوحة التحكم</h1>
+        <p class="page-subtitle">إدارة الطاولات والجلسات</p>
+    </div>
+    <div class="status-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span> فارغة</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--danger)"></span> مشغولة</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span> طلبات معلقة</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> نشاط</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--info)"></span> محجوزة</div>
+    </div>
+</div>
+
+<!-- Floor Tabs -->
+<div class="floor-tabs">
+    {% for floor in floors %}
+    <button class="floor-tab {% if forloop.first %}active{% endif %}" data-floor="{{ floor.pk }}">
+        {{ floor.name }}
+    </button>
+    {% endfor %}
+</div>
+
+<!-- Tables Grid -->
+{% for floor in floors %}
+<div class="tables-grid floor-content {% if not forloop.first %}hidden{% endif %}" data-floor="{{ floor.pk }}">
+    {% for table in floor.tables.all %}
+    <div class="table-card fade-in" data-status="{{ table.status }}" data-table-id="{{ table.pk }}"
+        onclick="openTablePanel({{ table.pk }}, '{{ table.display_name }}', '{{ table.status }}', '{{ table.uuid }}')">
+        <div class="table-number">{{ table.number }}</div>
+        <div class="table-name">{{ table.display_name }}</div>
+        <span class="table-status-badge {{ table.status }}">{{ table.get_status_display }}</span>
+    </div>
+    {% empty %}
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">
+        لا توجد طاولات في هذا الطابق. <a href="{% url 'manage_tables' %}" style="color:var(--accent-primary);">أضف
+            طاولات</a>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+<!-- Side Panel -->
+<div class="side-panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+<div class="side-panel" id="sidePanel">
+    <div class="panel-header">
+        <h3 id="panelTitle">تفاصيل الطاولة</h3>
+        <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panelBody">
+        <!-- Dynamic content -->
+    </div>
+    <div class="panel-footer" id="panelFooter">
+        <div class="panel-total">
+            <span>الإجمالي</span>
+            <span id="panelTotal" class="text-success">0 ج.م</span>
+        </div>
+        <div class="panel-actions" id="panelActions">
+            <!-- Dynamic buttons -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal for new session / merge -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">عنوان</h3>
+            <button class="panel-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer" id="modalFooter"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Floor tabs
+    document.querySelectorAll('.floor-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.floor-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.floor-content').forEach(c => c.classList.add('hidden'));
+            document.querySelector(`.floor-content[data-floor="${this.dataset.floor}"]`).classList.remove('hidden');
+        });
+    });
+
+    let currentTableId = null;
+    let currentTableUuid = null;
+    let currentSessionId = null;
+
+    function openTablePanel(tableId, tableName, status, uuid) {
+        currentTableId = tableId;
+        currentTableUuid = uuid;
+        document.getElementById('panelTitle').textContent = tableName;
+        document.getElementById('panelOverlay').classList.add('active');
+        document.getElementById('sidePanel').classList.add('active');
+
+        if (status === 'empty') {
+            showEmptyTablePanel(tableId, tableName);
+        } else {
+            loadSessionDetails(tableId);
+        }
+    }
+
+    function closePanel() {
+        document.getElementById('panelOverlay').classList.remove('active');
+        document.getElementById('sidePanel').classList.remove('active');
+    }
+
+    function showEmptyTablePanel(tableId, tableName) {
+        document.getElementById('panelBody').innerHTML = `
+        <div style="text-align:center;padding:40px 0;">
+            <div style="font-size:3rem;margin-bottom:16px;">🪑</div>
+            <p style="color:var(--text-muted);margin-bottom:20px;">الطاولة فارغة</p>
+            ${currentTableUuid ? `
+            <div style="margin-top:16px;padding:16px;background:var(--bg-secondary);border-radius:var(--radius-md);">
+                <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">🔗 رابط QR للعملاء</p>
+                <div style="word-break:break-all;font-size:0.8rem;color:var(--accent-primary);margin-bottom:8px;">
+                    ${window.location.origin}/qr/${currentTableUuid}/
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="copyQrLink()">📋 نسخ الرابط</button>
+                <a href="/manage/tables/" class="btn btn-ghost btn-sm" style="margin-right:8px;">📱 عرض QR Code</a>
+            </div>
+            ` : ''}
+        </div>
+    `;
+        document.getElementById('panelTotal').textContent = '0 ج.م';
+        document.getElementById('panelActions').innerHTML = `
+        <form method="post" action="/sessions/open/${tableId}/" style="width:100%">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+            <div class="form-group">
+                <label class="form-label">عدد الضيوف</label>
+                <input type="number" name="guest_count" value="1" min="1" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-success btn-block">🟢 فتح جلسة</button>
+        </form>
+    `;
+    }
+
+    function copyQrLink() {
+        const link = `${window.location.origin}/qr/${currentTableUuid}/`;
+        navigator.clipboard.writeText(link).then(() => showToast('تم نسخ الرابط'));
+    }
+
+    async function loadSessionDetails(tableId) {
+        const body = document.getElementById('panelBody');
+        body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="text-muted">جارٍ التحميل...</div></div>';
+
+        try {
+            const res = await fetch(`/api/sessions/by-table/${tableId}/`);
+            if (res.ok) {
+                const session = await res.json();
+                currentSessionId = session.id;
+                renderSessionPanel(session);
+            } else {
+                showEmptyTablePanel(tableId, '');
+            }
+        } catch (e) {
+            showEmptyTablePanel(tableId, '');
+        }
+    }
+
+    function renderSessionPanel(session) {
+        let ordersHtml = '';
+        if (session.orders && session.orders.length > 0) {
+            session.orders.forEach(order => {
+                let itemsHtml = order.items.map(item => `
+                <div class="order-item">
+                    <div class="order-item-qty">${item.quantity}</div>
+                    <div class="order-item-info">
+                        <div class="order-item-name">${item.product}</div>
+                        ${item.notes ? `<div class="order-item-notes">${item.notes}</div>` : ''}
+                    </div>
+                    <div class="order-item-price">${item.subtotal} ج.م</div>
+                </div>
+            `).join('');
+
+                ordersHtml += `
+                <div class="card mb-2">
+                    <div class="d-flex align-center justify-between mb-1">
+                        <span class="badge" style="background:${order.status_color}20;color:${order.status_color}">
+                            ${order.status_display}
+                        </span>
+                        <span class="text-muted" style="font-size:0.8rem;">${order.created_at}</span>
+                    </div>
+                    ${itemsHtml}
+                    <div class="d-flex justify-between mt-1" style="padding-top:8px;border-top:1px solid var(--border-color);">
+                        <span class="text-muted">إجمالي الطلب</span>
+                        <span class="fw-bold">${order.total} ج.م</span>
+                    </div>
+                    ${order.status === 'pending' ? `
+                        <button class="btn btn-success btn-sm btn-block mt-1" onclick="updateOrderStatus(${order.id}, 'confirmed')">✓ تأكيد الطلب</button>
+                    ` : ''}
+                    ${order.status === 'ready' ? `
+                        <button class="btn btn-info btn-sm btn-block mt-1" onclick="updateOrderStatus(${order.id}, 'delivered')">📦 تم التوصيل</button>
+                    ` : ''}
+                </div>
+            `;
+            });
+        } else {
+            ordersHtml = '<p class="text-muted text-center">لا توجد طلبات</p>';
+        }
+
+        let activitiesHtml = '';
+        if (session.activities && session.activities.length > 0) {
+            session.activities.forEach(act => {
+                activitiesHtml += `
+                <div class="card mb-1" style="padding:12px;">
+                    <div class="d-flex align-center justify-between">
+                        <div>
+                            <div class="fw-bold">${act.device}</div>
+                            <div class="text-muted" style="font-size:0.8rem;">${act.type} - ${act.duration}</div>
+                        </div>
+                        <div style="text-align:left;">
+                            <div class="fw-bold text-success">${act.cost} ج.م</div>
+                            ${!act.ended ? `<button class="btn btn-danger btn-sm mt-1" onclick="endActivity(${act.id})">إنهاء</button>` : '<span class="badge badge-success">مكتمل</span>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            });
+        }
+
+        document.getElementById('panelBody').innerHTML = `
+        <div class="d-flex justify-between mb-2">
+            <span class="badge badge-info">${session.status_display}</span>
+            <span class="text-muted" style="font-size:0.85rem;">منذ ${session.opened_at} (${session.duration})</span>
+        </div>
+        <div class="d-flex gap-1 mb-2" style="gap:12px;">
+            <div class="stat-card" style="flex:1;padding:12px;">
+                <div><div class="stat-value" style="font-size:1.1rem;">${session.guest_count}</div><div class="stat-label">ضيوف</div></div>
+            </div>
+            <div class="stat-card" style="flex:1;padding:12px;">
+                <div><div class="stat-value" style="font-size:1.1rem;">${session.tables.length}</div><div class="stat-label">طاولات</div></div>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="panel-section-title">📋 الطلبات</div>
+            ${ordersHtml}
+        </div>
+
+        ${activitiesHtml ? `
+        <div class="panel-section">
+            <div class="panel-section-title">🎮 الأنشطة</div>
+            ${activitiesHtml}
+        </div>
+        ` : ''}
+    `;
+
+        document.getElementById('panelTotal').textContent = `${session.total_amount} ج.م`;
+        document.getElementById('panelActions').innerHTML = `
+        <button class="btn btn-primary" onclick="showOrderModal()">📋 إضافة طلب</button>
+        <button class="btn btn-success" onclick="showPaymentModal(${session.id}, ${session.total_amount})">💰 دفع</button>
+        <button class="btn btn-info" onclick="showMergeModal(${session.id})">🔗 دمج</button>
+        <button class="btn btn-ghost" onclick="showActivityModal(${session.id})">🎮 نشاط</button>
+    `;
+    }
+
+    // ===== ORDER CREATION =====
+    let orderCart = {};
+
+    async function showOrderModal() {
+        document.getElementById('modalTitle').textContent = '📋 إضافة طلب';
+        document.getElementById('modalBody').innerHTML = '<div style="text-align:center;padding:20px;"><div class="text-muted">جارٍ تحميل المنتجات...</div></div>';
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+        orderCart = {};
+        window._productData = {};
+
+        try {
+            const res = await fetch('/api/products/');
+            const data = await res.json();
+
+            if (!data.categories || data.categories.length === 0) {
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="text-align:center;padding:30px;color:var(--text-muted);">
+                        <div style="font-size:2rem;margin-bottom:8px;">📦</div>
+                        <p>لا توجد منتجات. <a href="/manage/products/" style="color:var(--accent-primary);">أضف منتجات</a></p>
+                    </div>`;
+                return;
+            }
+
+            let tabsHtml = '<div class="floor-tabs" style="margin-bottom:12px;flex-wrap:wrap;">';
+            let productsHtml = '';
+
+            data.categories.forEach((cat, idx) => {
+                tabsHtml += `<button class="floor-tab ${idx === 0 ? 'active' : ''}" onclick="switchOrderCategory(this, '${cat.id}')">${cat.icon} ${cat.name}</button>`;
+                productsHtml += `<div class="order-category-panel ${idx > 0 ? 'hidden' : ''}" data-cat-id="${cat.id}">`;
+
+                cat.products.forEach(p => {
+                    window._productData[p.id] = p;
+                    let sizesHtml = '';
+                    if (p.has_sizes && p.sizes.length > 0) {
+                        sizesHtml = '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">';
+                        p.sizes.forEach((s, si) => {
+                            sizesHtml += `<button class="btn btn-sm ${si===0?'btn-primary':'btn-ghost'}" 
+                                style="font-size:0.75rem;padding:4px 10px;min-height:28px;" 
+                                onclick="selectOrderSize(${p.id},${s.id},${s.price},this)"
+                                data-sid="${s.id}" data-sprice="${s.price}">
+                                ${s.name} (${s.price} ج.م)
+                            </button>`;
+                        });
+                        sizesHtml += '</div>';
+                    }
+
+                    productsHtml += `
+                    <div class="order-product-item" style="padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);margin-bottom:6px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <div>
+                                <div class="fw-bold">${p.name}</div>
+                                <div class="text-muted" style="font-size:0.8rem;">${p.has_sizes ? 'ابتداءً من ' : ''}${p.price} ج.م</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button class="btn btn-ghost btn-sm" onclick="changeQty(${p.id}, -1)" style="width:32px;height:32px;padding:0;">−</button>
+                                <span id="qty-${p.id}" class="fw-bold" style="min-width:20px;text-align:center;">0</span>
+                                <button class="btn btn-primary btn-sm" onclick="changeQty(${p.id}, 1)" style="width:32px;height:32px;padding:0;">+</button>
+                            </div>
+                        </div>
+                        ${sizesHtml}
+                    </div>`;
+                });
+                productsHtml += '</div>';
+            });
+            tabsHtml += '</div>';
+
+            document.getElementById('modalBody').innerHTML = tabsHtml + productsHtml;
+            document.getElementById('modalFooter').innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
+                    <div>
+                        <span class="text-muted">الإجمالي: </span>
+                        <span id="orderCartTotal" class="fw-bold text-success">0 ج.م</span>
+                    </div>
+                    <button class="btn btn-success" onclick="submitOrder()">📤 إرسال الطلب</button>
+                </div>`;
+        } catch (e) {
+            document.getElementById('modalBody').innerHTML = '<p class="text-danger text-center">خطأ في تحميل المنتجات</p>';
+        }
+    }
+
+    function switchOrderCategory(btn, catId) {
+        btn.parentNode.querySelectorAll('.floor-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.order-category-panel').forEach(p => p.classList.add('hidden'));
+        document.querySelector(`.order-category-panel[data-cat-id="${catId}"]`).classList.remove('hidden');
+    }
+
+    function selectOrderSize(pid, sizeId, sizePrice, btn) {
+        // Highlight selected size
+        btn.parentNode.querySelectorAll('.btn').forEach(b => {
+            b.className = b.className.replace('btn-primary', 'btn-ghost');
+        });
+        btn.className = btn.className.replace('btn-ghost', 'btn-primary');
+
+        // Update cart entry if exists
+        if (orderCart[pid]) {
+            orderCart[pid].sizeId = sizeId;
+            orderCart[pid].price = sizePrice;
+            updateOrderTotal();
+        }
+    }
+
+    function changeQty(productId, delta) {
+        if (!orderCart[productId]) {
+            const pData = window._productData[productId];
+            let price = pData.price;
+            let sizeId = null;
+            if (pData.has_sizes && pData.sizes.length > 0) {
+                // Default to first size
+                sizeId = pData.sizes[0].id;
+                price = pData.sizes[0].price;
+            }
+            orderCart[productId] = { qty: 0, sizeId, price };
+        }
+
+        orderCart[productId].qty = Math.max(0, orderCart[productId].qty + delta);
+        if (orderCart[productId].qty === 0) {
+            delete orderCart[productId];
+        }
+
+        const qtyEl = document.getElementById(`qty-${productId}`);
+        qtyEl.textContent = orderCart[productId] ? orderCart[productId].qty : 0;
+        updateOrderTotal();
+    }
+
+    function updateOrderTotal() {
+        let total = 0;
+        for (const [pid, v] of Object.entries(orderCart)) {
+            total += v.price * v.qty;
+        }
+        const el = document.getElementById('orderCartTotal');
+        if (el) el.textContent = `${total.toFixed(0)} ج.م`;
+    }
+
+    async function submitOrder() {
+        const items = Object.entries(orderCart).map(([pid, v]) => {
+            const item = { product_id: parseInt(pid), quantity: v.qty };
+            if (v.sizeId) item.size_id = v.sizeId;
+            return item;
+        });
+        if (items.length === 0) {
+            showToast('اختر منتجات أولاً', 'error');
+            return;
+        }
+        const result = await apiPost('/api/orders/create/', {
+            table_uuid: currentTableUuid,
+            items: items,
+            is_from_qr: false,
+        });
+        if (result.success) {
+            showToast('تم إرسال الطلب بنجاح ✓');
+            closeModal();
+            if (result.order_id) {
+                window.open(`/orders/ticket/${result.order_id}/`, '_blank', 'width=350,height=600');
+            }
+            loadSessionDetails(currentTableId);
+        } else {
+            showToast(result.error || 'خطأ في إنشاء الطلب', 'error');
+        }
+    }
+
+    // ===== ORDER STATUS =====
+    async function updateOrderStatus(orderId, newStatus) {
+        const result = await apiPost(`/api/orders/${orderId}/status/`, { status: newStatus });
+        if (result.success) {
+            showToast('تم تحديث الحالة بنجاح');
+            // Auto-print kitchen ticket when order is confirmed
+            if (newStatus === 'confirmed') {
+                window.open(`/orders/ticket/${orderId}/`, '_blank', 'width=350,height=600');
+            }
+            loadSessionDetails(currentTableId);
+        } else {
+            showToast(result.error || 'حدث خطأ', 'error');
+        }
+    }
+
+    async function endActivity(activityId) {
+        const result = await apiPost(`/api/activities/${activityId}/end/`);
+        if (result.success) {
+            showToast(`تم إنهاء النشاط - ${result.total_price} ج.م`);
+            loadSessionDetails(currentTableId);
+        }
+    }
+
+    function showPaymentModal(sessionId, total) {
+        document.getElementById('modalTitle').textContent = 'دفع وإغلاق الجلسة';
+        document.getElementById('modalBody').innerHTML = `
+        <form id="paymentForm" method="post" action="/payments/pay/${sessionId}/" target="_blank" onsubmit="setTimeout(()=>{closeModal();location.reload();},500)">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+            <div class="stat-card mb-2" style="justify-content:center;">
+                <div class="text-center">
+                    <div class="stat-value text-success">${total} ج.م</div>
+                    <div class="stat-label">الإجمالي</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">طريقة الدفع</label>
+                <select name="method" class="form-control">
+                    <option value="cash">كاش 💵</option>
+                    <option value="card">بطاقة 💳</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">خصم</label>
+                <input type="number" name="discount" value="0" min="0" class="form-control">
+            </div>
+            <div class="form-group">
+                <label class="form-label">ملاحظات</label>
+                <input type="text" name="notes" class="form-control" placeholder="ملاحظات اختيارية">
+            </div>
+            <button type="submit" class="btn btn-success btn-block btn-lg">🖨️ تأكيد الدفع وطباعة الفاتورة</button>
+        </form>
+    `;
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function showMergeModal(sessionId) {
+        document.getElementById('modalTitle').textContent = 'دمج طاولة';
+        document.getElementById('modalBody').innerHTML = `
+        <p class="text-muted mb-2">اختر الطاولة المراد دمجها:</p>
+        <div id="mergeTablesGrid" class="tables-grid" style="grid-template-columns:repeat(auto-fill,minmax(80px,1fr));">
+            جارٍ التحميل...
+        </div>
+    `;
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+
+        // Load empty tables
+        apiGet('/api/tables/status/').then(data => {
+            let html = '';
+            data.floors.forEach(floor => {
+                floor.tables.forEach(t => {
+                    if (t.status === 'empty') {
+                        html += `
+                        <div class="table-card" data-status="empty" style="aspect-ratio:1;cursor:pointer;"
+                             onclick="mergeTables(${sessionId}, ${t.id})">
+                            <div class="table-number" style="font-size:1.3rem;">${t.number}</div>
+                            <div class="table-name" style="font-size:0.7rem;">${t.name}</div>
+                        </div>
+                    `;
+                    }
+                });
+            });
+            document.getElementById('mergeTablesGrid').innerHTML = html || '<p class="text-muted">لا توجد طاولات فارغة</p>';
+        });
+    }
+
+    async function mergeTables(sessionId, tableId) {
+        const result = await apiPost(`/api/sessions/${sessionId}/merge/`, { table_id: tableId });
+        if (result.success) {
+            showToast('تم دمج الطاولة بنجاح');
+            closeModal();
+            location.reload();
+        }
+    }
+
+    function showActivityModal(sessionId) {
+        document.getElementById('modalTitle').textContent = 'بدء نشاط';
+        document.getElementById('modalBody').innerHTML = 'جارٍ التحميل...';
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+
+        apiGet('/api/activities/devices/').then(data => {
+            if (!data.activity_types || data.activity_types.length === 0) {
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="text-align:center;padding:30px;color:var(--text-muted);">
+                        <div style="font-size:2rem;margin-bottom:8px;">🎮</div>
+                        <p>لا توجد أنشطة. <a href="/manage/devices/" style="color:var(--accent-primary);">أضف أنشطة وأجهزة</a></p>
+                    </div>`;
+                return;
+            }
+            let html = '';
+            data.activity_types.forEach(at => {
+                html += `<h4 style="margin:12px 0 8px;">${at.icon} ${at.name} <span class="text-muted" style="font-size:0.8rem;">(${at.price_per_hour} ج.م/ساعة)</span></h4>`;
+                at.devices.forEach(d => {
+                    const isAvailable = d.status === 'available';
+                    html += `
+                    <div class="card mb-1" style="padding:12px;opacity:${isAvailable ? 1 : 0.5};">
+                        <div class="d-flex align-center justify-between">
+                            <span>${d.name}</span>
+                            ${isAvailable ?
+                            `<button class="btn btn-success btn-sm" onclick="startActivity(${d.id}, ${sessionId})">تشغيل</button>` :
+                            `<span class="badge badge-danger">${d.status_display}</span>`
+                        }
+                        </div>
+                    </div>
+                `;
+                });
+            });
+            document.getElementById('modalBody').innerHTML = html;
+        });
+    }
+
+    async function startActivity(deviceId, sessionId) {
+        const result = await apiPost('/api/activities/start/', { device_id: deviceId, session_id: sessionId });
+        if (result.success) {
+            showToast('تم تشغيل النشاط');
+            closeModal();
+            loadSessionDetails(currentTableId);
+        } else {
+            showToast(result.error || 'خطأ', 'error');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    // Auto refresh every 30s
+    setInterval(() => {
+        if (currentTableId && document.getElementById('sidePanel').classList.contains('active')) {
+            loadSessionDetails(currentTableId);
+        }
+    }, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}إدارة الطوابق{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🏢 إدارة الطوابق</h1><a href="{% url 'manage' %}" class="btn btn-ghost btn-sm">← رجوع</a>
+</div>
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة طابق جديد</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add">
+        <input type="text" name="name" placeholder="اسم الطابق" class="form-control" style="flex:1;min-width:200px;"
+            required>
+        <input type="number" name="order" placeholder="الترتيب" class="form-control" style="width:100px;" value="0">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>الاسم</th>
+                <th>الترتيب</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for floor in floors %}
+            <tr>
+                <td class="fw-bold">{{ floor.name }}</td>
+                <td>{{ floor.order }}</td>
+                <td><span class="badge {% if floor.is_active %}badge-success{% else %}badge-danger{% endif %}">{{
+                        floor.is_active|yesno:"نشط,معطل" }}</span></td>
+                <td>
+                    <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
+                            value="toggle"><input type="hidden" name="id" value="{{ floor.pk }}"><button
+                            class="btn btn-ghost btn-sm">🔄</button></form>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">{% csrf_token %}<input
+                            type="hidden" name="action" value="delete"><input type="hidden" name="id"
+                            value="{{ floor.pk }}"><button class="btn btn-danger btn-sm">🗑</button></form>
+                </td>
+            </tr>
+            {% empty %}<tr>
+                <td colspan="4" class="text-center text-muted">لا توجد طوابق</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

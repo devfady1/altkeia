@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}إدارة المنتجات{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">☕ إدارة المنتجات</h1><a href="{% url 'manage' %}" class="btn btn-ghost btn-sm">← رجوع</a>
+</div>
+
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة تصنيف</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add_category">
+        <input type="text" name="name" placeholder="اسم التصنيف" class="form-control" style="flex:1;min-width:200px;"
+            required>
+        <input type="text" name="icon" placeholder="أيقونة" class="form-control" style="width:80px;" value="☕">
+        <input type="number" name="order" placeholder="الترتيب" class="form-control" style="width:100px;" value="0">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة منتج</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add_product">
+        <select name="category" class="form-control" style="width:160px;" required>
+            <option value="">التصنيف</option>
+            {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+        </select>
+        <input type="text" name="name" placeholder="اسم المنتج" class="form-control" style="flex:1;min-width:150px;"
+            required>
+        <input type="number" name="price" placeholder="السعر" class="form-control" style="width:120px;" step="0.5"
+            required>
+        <input type="text" name="description" placeholder="الوصف (اختياري)" class="form-control"
+            style="flex:1;min-width:150px;">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+
+{% for category in categories %}
+<div class="card mb-2">
+    <div class="card-header">
+        <h3 class="card-title">{{ category.icon }} {{ category.name }}</h3>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>المنتج</th>
+                <th>السعر</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in category.products.all %}
+            <tr>
+                <td class="fw-bold">{{ product.name }}</td>
+                <td>{{ product.price }} ج.م</td>
+                <td><span class="badge {% if product.is_available %}badge-success{% else %}badge-danger{% endif %}">{{
+                        product.is_available|yesno:"متاح,غير متاح" }}</span></td>
+                <td>
+                    <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
+                            value="toggle_product"><input type="hidden" name="id" value="{{ product.pk }}"><button
+                            class="btn btn-ghost btn-sm">🔄</button></form>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">{% csrf_token %}<input
+                            type="hidden" name="action" value="delete_product"><input type="hidden" name="id"
+                            value="{{ product.pk }}"><button class="btn btn-danger btn-sm">🗑</button></form>
+                </td>
+            </tr>
+            {% empty %}<tr>
+                <td colspan="4" class="text-muted text-center">لا توجد منتجات</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endblock %}

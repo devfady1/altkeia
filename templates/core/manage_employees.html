@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}إدارة الموظفين{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">👥 إدارة الموظفين</h1><a href="{% url 'manage' %}" class="btn btn-ghost btn-sm">← رجوع</a>
+</div>
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة موظف</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add">
+        <input type="text" name="username" placeholder="اسم المستخدم" class="form-control" style="width:150px;"
+            required>
+        <input type="password" name="password" placeholder="كلمة المرور" class="form-control" style="width:150px;"
+            required>
+        <input type="text" name="first_name" placeholder="الاسم الأول" class="form-control" style="width:130px;">
+        <input type="text" name="last_name" placeholder="اسم العائلة" class="form-control" style="width:130px;">
+        <select name="role" class="form-control" style="width:130px;" required>
+            <option value="waiter">ويتر</option>
+            <option value="cashier">كاشير</option>
+            <option value="kitchen">مطبخ</option>
+            <option value="manager">مدير</option>
+        </select>
+        <input type="text" name="phone" placeholder="الهاتف" class="form-control" style="width:130px;">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>المستخدم</th>
+                <th>الاسم</th>
+                <th>الدور</th>
+                <th>الهاتف</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emp in employees %}
+            <tr>
+                <td class="fw-bold">{{ emp.username }}</td>
+                <td>{{ emp.get_full_name }}</td>
+                <td><span class="badge badge-info">{{ emp.get_role_display }}</span></td>
+                <td>{{ emp.phone|default:"-" }}</td>
+                <td><span class="badge {% if emp.is_active_employee %}badge-success{% else %}badge-danger{% endif %}">{{
+                        emp.is_active_employee|yesno:"نشط,معطل" }}</span></td>
+                <td>
+                    {% if emp.role != 'owner' %}
+                    <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
+                            value="toggle"><input type="hidden" name="id" value="{{ emp.pk }}"><button
+                            class="btn btn-ghost btn-sm">🔄</button></form>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">{% csrf_token %}<input
+                            type="hidden" name="action" value="delete"><input type="hidden" name="id"
+                            value="{{ emp.pk }}"><button class="btn btn-danger btn-sm">🗑</button></form>
+                    {% else %}<span class="text-muted">-</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

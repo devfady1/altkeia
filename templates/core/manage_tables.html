@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}إدارة الطاولات{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🪑 إدارة الطاولات</h1><a href="{% url 'manage' %}" class="btn btn-ghost btn-sm">← رجوع</a>
+</div>
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة طاولة</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add">
+        <select name="floor" class="form-control" style="width:160px;" required>
+            <option value="">الطابق</option>
+            {% for f in floors %}
+            <option value="{{ f.pk }}">{{ f.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="number" placeholder="الرقم" class="form-control" style="width:100px;" required>
+        <input type="text" name="name" placeholder="اسم (اختياري)" class="form-control" style="flex:1;min-width:150px;">
+        <input type="number" name="capacity" placeholder="السعة" class="form-control" style="width:100px;" value="4">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>الرقم</th>
+                <th>الاسم</th>
+                <th>الطابق</th>
+                <th>السعة</th>
+                <th>QR Code</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for table in tables %}
+            <tr>
+                <td class="fw-bold">{{ table.number }}</td>
+                <td>{{ table.display_name }}</td>
+                <td>{{ table.floor.name }}</td>
+                <td>{{ table.capacity }}</td>
+                <td>
+                    {% if table.qr_code %}
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                        <img src="{{ table.qr_code.url }}" alt="QR" style="width:60px;height:60px;border-radius:4px;">
+                        <div style="font-size:0.7rem;color:var(--text-muted);word-break:break-all;max-width:150px;text-align:center;">
+                            /qr/{{ table.uuid }}/
+                        </div>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="generate_qr">
+                            <input type="hidden" name="id" value="{{ table.pk }}">
+                            <button class="btn btn-ghost btn-sm" style="font-size:0.7rem;">🔄 إعادة إنشاء</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <form method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="generate_qr">
+                        <input type="hidden" name="id" value="{{ table.pk }}">
+                        <button class="btn btn-primary btn-sm">📱 إنشاء QR</button>
+                    </form>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="id" value="{{ table.pk }}">
+                        <button class="btn btn-danger btn-sm">🗑</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center text-muted">لا توجد طاولات</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

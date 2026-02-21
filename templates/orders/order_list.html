@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}الطلبات{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">📋 الطلبات النشطة</h1>
+        <p class="page-subtitle">جميع الطلبات الحالية</p>
+    </div>
+</div>
+
+<div class="card">
+    <table class="data-table" id="ordersTable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الطاولة</th>
+                <th>الأصناف</th>
+                <th>الإجمالي</th>
+                <th>الحالة</th>
+                <th>الوقت</th>
+                <th>المصدر</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr class="fade-in">
+                <td><strong>{{ order.pk }}</strong></td>
+                <td>
+                    <strong>{{ order.table.display_name }}</strong>
+                </td>
+                <td>
+                    {% for item in order.items.all %}
+                    <div style="font-size:0.88rem;">
+                        <span class="badge" style="background:var(--accent-gradient);color:#fff;font-size:0.75rem;margin-inline-end:4px;">{{ item.quantity }}×</span>
+                        {{ item.display_name }}
+                        {% if item.notes %}<span class="text-muted" style="font-size:0.78rem;"> ({{ item.notes }})</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </td>
+                <td>
+                    <strong class="text-success">{{ order.total }} ج.م</strong>
+                </td>
+                <td>
+                    <span class="badge" style="background:{{ order.status_color }}20;color:{{ order.status_color }}">
+                        {{ order.get_status_display }}
+                    </span>
+                </td>
+                <td>
+                    <span class="text-muted">{{ order.created_at|time:"H:i" }}</span>
+                </td>
+                <td>
+                    {% if order.is_from_qr %}
+                    <span class="badge badge-info">QR</span>
+                    {% else %}
+                    <span class="badge badge-purple">موظف</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="d-flex gap-1" style="gap:4px;">
+                        {% if order.status == 'pending' %}
+                        <button class="btn btn-success btn-sm" onclick="updateStatus({{ order.pk }}, 'confirmed')">✓ تأكيد</button>
+                        <button class="btn btn-danger btn-sm" onclick="updateStatus({{ order.pk }}, 'cancelled')">✕ إلغاء</button>
+                        {% elif order.status == 'confirmed' %}
+                        <button class="btn btn-warning btn-sm" onclick="updateStatus({{ order.pk }}, 'preparing')">🍳 تحضير</button>
+                        {% elif order.status == 'preparing' %}
+                        <button class="btn btn-success btn-sm" onclick="updateStatus({{ order.pk }}, 'ready')">✓ جاهز</button>
+                        {% elif order.status == 'ready' %}
+                        <button class="btn btn-info btn-sm" onclick="updateStatus({{ order.pk }}, 'delivered')">📦 تم التوصيل</button>
+                        {% endif %}
+                        <button class="btn btn-ghost btn-sm" onclick="window.open('/orders/ticket/{{ order.pk }}/', '_blank', 'width=350,height=600')" title="طباعة">🖨️</button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align:center;padding:60px;color:var(--text-muted);">
+                    <div style="font-size:3rem;margin-bottom:12px;">📋</div>
+                    <p>لا توجد طلبات نشطة</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    async function updateStatus(id, status) {
+        const r = await apiPost(`/api/orders/${id}/status/`, { status });
+        if (r.success) {
+            showToast('تم');
+            // Auto-print kitchen ticket when confirming
+            if (status === 'confirmed') {
+                window.open(`/orders/ticket/${id}/`, '_blank', 'width=350,height=600');
+            }
+            setTimeout(() => location.reload(), 500);
+        }
+        else showToast(r.error || 'خطأ', 'error');
+    }
+    setInterval(() => location.reload(), 20000);
+</script>
+{% endblock %}

@@ -1,0 +1,814 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>المنيو - {{ table.display_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a14;
+            --bg2: #12121e;
+            --card: #1a1a2e;
+            --card-hover: #222240;
+            --text: #f0f0f0;
+            --text2: #a0a0b8;
+            --muted: #6a6a80;
+            --accent: #e94560;
+            --accent2: #c23152;
+            --grad: linear-gradient(135deg, #e94560, #c23152);
+            --success: #00d68f;
+            --border: rgba(255,255,255,0.06);
+            --r: 14px;
+            --rs: 10px;
+            --font: 'Cairo', sans-serif;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html { direction:rtl; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg2);
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(12px);
+        }
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .logo {
+            font-size: 1.3rem;
+            font-weight: 800;
+            background: var(--grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .table-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(233,69,96,0.15);
+            color: var(--accent);
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        .header-sub {
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        /* Category Chips */
+        .cats-wrap {
+            padding: 12px 16px;
+            overflow-x: auto;
+            display: flex;
+            gap: 8px;
+            -webkit-overflow-scrolling: touch;
+            position: sticky;
+            top: 68px;
+            z-index: 40;
+            background: var(--bg);
+        }
+        .cats-wrap::-webkit-scrollbar { display: none; }
+        .cat-chip {
+            padding: 8px 16px;
+            border-radius: 22px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: var(--font);
+        }
+        .cat-chip.active {
+            background: var(--grad);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 3px 12px rgba(233,69,96,0.3);
+        }
+
+        /* Menu Container */
+        .menu-wrap {
+            padding: 8px 16px 120px;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--muted);
+            margin: 16px 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Product Card */
+        .prod-card {
+            background: var(--card);
+            border-radius: var(--r);
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+        .prod-card.selected {
+            border-color: rgba(233,69,96,0.4);
+            box-shadow: 0 0 0 1px rgba(233,69,96,0.15);
+        }
+
+        .prod-main {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px;
+        }
+        .prod-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: var(--rs);
+            background: rgba(233,69,96,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .prod-info { flex: 1; }
+        .prod-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+        }
+        .prod-desc {
+            font-size: 0.75rem;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+        .prod-price {
+            font-weight: 800;
+            color: var(--success);
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+        .prod-price-sub {
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+
+        /* Size Selector */
+        .size-strip {
+            padding: 0 14px 10px;
+            display: flex;
+            gap: 6px;
+        }
+        .size-btn {
+            flex: 1;
+            padding: 8px 4px;
+            border-radius: var(--rs);
+            border: 1.5px solid var(--border);
+            background: transparent;
+            color: var(--text2);
+            font-family: var(--font);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .size-btn.active {
+            border-color: var(--accent);
+            background: rgba(233,69,96,0.1);
+            color: var(--accent);
+        }
+        .size-btn .sz-name {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .size-btn .sz-price {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+        .size-btn.active .sz-price {
+            color: var(--accent);
+        }
+
+        /* Qty Controls */
+        .qty-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 6px 14px 12px;
+        }
+        .qty-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            font-family: var(--font);
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .qty-circle.plus {
+            background: var(--grad);
+            color: white;
+        }
+        .qty-circle.minus {
+            background: rgba(255,255,255,0.08);
+            color: var(--text2);
+        }
+        .qty-circle:active { transform: scale(0.9); }
+        .qty-num {
+            font-weight: 800;
+            font-size: 1.1rem;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        /* Cart Bar */
+        .cart-bar {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            padding: 12px 16px;
+            background: var(--bg2);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 60;
+            max-width: 480px;
+            margin: 0 auto;
+            backdrop-filter: blur(16px);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        .cart-bar.show { transform: translateY(0); }
+        .cart-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .cart-count {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--grad);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.88rem;
+            font-weight: 800;
+        }
+        .cart-total {
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: var(--success);
+        }
+        .send-btn {
+            padding: 10px 24px;
+            border-radius: var(--rs);
+            background: var(--grad);
+            border: none;
+            color: white;
+            font-family: var(--font);
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .send-btn:active { transform: scale(0.96); }
+
+        /* Queue Section */
+        .queue-section {
+            padding: 0 16px 20px;
+        }
+        .queue-card {
+            background: var(--card);
+            border-radius: var(--r);
+            border: 1px solid var(--border);
+            padding: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .queue-icon { font-size: 1.4rem; }
+        .queue-info { flex: 1; }
+        .queue-name { font-weight: 700; font-size: 0.95rem; }
+        .queue-price { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+        .queue-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .queue-btn {
+            padding: 8px 14px;
+            border-radius: var(--rs);
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            font-family: var(--font);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Bill link */
+        .bill-link {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            margin: 0 16px 20px;
+            border-radius: var(--rs);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .bill-link:hover { background: rgba(255,255,255,0.08); }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 12px 16px;
+            border-radius: var(--rs);
+            color: white;
+            font-weight: 600;
+            font-size: 0.88rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s ease;
+            text-align: center;
+        }
+        .toast-success { background: linear-gradient(135deg, #00d68f, #00b377); }
+        .toast-error { background: linear-gradient(135deg, #ff3d71, #e0294f); }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 300;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-sheet {
+            background: var(--bg2);
+            border-radius: var(--r) var(--r) 0 0;
+            width: 100%;
+            max-width: 480px;
+            padding: 24px 20px 32px;
+            transform: translateY(100%);
+            transition: transform 0.35s ease;
+        }
+        .modal-overlay.active .modal-sheet { transform: translateY(0); }
+        .modal-handle {
+            width: 40px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto 16px;
+        }
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .form-group { margin-bottom: 14px; }
+        .form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text2);
+            margin-bottom: 6px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: var(--rs);
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.92rem;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .modal-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: var(--rs);
+            border: none;
+            background: var(--grad);
+            color: white;
+            font-family: var(--font);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        /* No results */
+        .empty-state {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--muted);
+        }
+        .empty-state .emoji { font-size: 2.5rem; margin-bottom: 8px; }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-top">
+            <span class="logo">☕ المنيو</span>
+            <span class="table-badge">{{ table.display_name }}</span>
+        </div>
+        <div class="header-sub">اختر طلبك وأرسله مباشرة 🚀</div>
+    </div>
+
+    <!-- Category Chips -->
+    <div class="cats-wrap">
+        <button class="cat-chip active" onclick="filterCat('all', this)">🍽️ الكل</button>
+        {% for category in categories %}
+        <button class="cat-chip" onclick="filterCat('c{{ category.pk }}', this)">
+            {{ category.icon }} {{ category.name }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Menu Items -->
+    <div class="menu-wrap">
+        {% for category in categories %}
+        <div class="section-title cat-title c{{ category.pk }}">
+            {{ category.icon }} {{ category.name }}
+            <div class="section-line"></div>
+        </div>
+
+        {% for product in category.products.all %}
+        {% if product.is_available and product.is_active %}
+        <div class="prod-card c{{ category.pk }}"
+             data-pid="{{ product.pk }}"
+             data-price="{{ product.price }}"
+             data-name="{{ product.name }}"
+             data-has-sizes="{% if product.has_sizes %}1{% else %}0{% endif %}">
+
+            <div class="prod-main">
+                <div class="prod-icon">{{ category.icon }}</div>
+                <div class="prod-info">
+                    <div class="prod-name">{{ product.name }}</div>
+                    {% if product.description %}<div class="prod-desc">{{ product.description }}</div>{% endif %}
+                </div>
+                <div style="text-align:left;">
+                    {% if product.has_sizes %}
+                    <div class="prod-price-sub">ابتداءً من</div>
+                    {% endif %}
+                    <div class="prod-price">{{ product.price }} ج.م</div>
+                </div>
+            </div>
+
+            {% if product.has_sizes %}
+            <div class="size-strip" id="sizes-{{ product.pk }}">
+                {% for sz in product.sizes.all %}
+                {% if sz.is_active %}
+                <button class="size-btn {% if forloop.first %}active{% endif %}"
+                        data-sid="{{ sz.pk }}"
+                        data-sprice="{{ sz.price }}"
+                        data-sname="{{ sz.display_name }}"
+                        onclick="selectSize({{ product.pk }}, this)">
+                    <span class="sz-name">{{ sz.display_name }}</span>
+                    <span class="sz-price">{{ sz.price }} ج.م</span>
+                </button>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="qty-row" id="qrow-{{ product.pk }}" style="display:none;">
+                <button class="qty-circle minus" onclick="changeQty({{ product.pk }}, -1)">−</button>
+                <span class="qty-num" id="qn-{{ product.pk }}">0</span>
+                <button class="qty-circle plus" onclick="changeQty({{ product.pk }}, 1)">+</button>
+            </div>
+
+            {% if not product.has_sizes %}
+            <div style="padding:0 14px 10px; text-align:center;">
+                <button class="qty-circle plus" onclick="changeQty({{ product.pk }}, 1)" id="addbtn-{{ product.pk }}" style="width:100%;border-radius:var(--rs);font-size:0.88rem;">+ أضف</button>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+    </div>
+
+    <!-- Queue Section -->
+    {% if activity_types %}
+    <div class="queue-section">
+        <div class="section-title">
+            ⏳ الطابور والأنشطة
+            <div class="section-line"></div>
+        </div>
+        {% for at in activity_types %}
+        <div class="queue-card">
+            <span class="queue-icon">{{ at.icon }}</span>
+            <div class="queue-info">
+                <div class="queue-name">{{ at.name }}</div>
+                <div class="queue-price">{{ at.price_per_hour }} ج.م / ساعة</div>
+            </div>
+            <span class="queue-badge {% if at.waiting_count > 0 %}badge-warning{% else %}badge-success{% endif %}"
+                  style="background:{% if at.waiting_count > 0 %}rgba(255,170,0,0.15);color:#ffaa00{% else %}rgba(0,214,143,0.15);color:#00d68f{% endif %}">
+                {% if at.waiting_count > 0 %}{{ at.waiting_count }} منتظر{% else %}متاح{% endif %}
+            </span>
+            <button class="queue-btn" onclick="joinQueue({{ at.id }}, '{{ at.name }}')">📝 سجّل</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Bill Link -->
+    {% if session %}
+    <a href="{% url 'qr_bill' table.uuid %}" class="bill-link">
+        📄 عرض الفاتورة
+    </a>
+    {% endif %}
+
+    <!-- Cart Bar -->
+    <div class="cart-bar" id="cartBar">
+        <div class="cart-left">
+            <div class="cart-count" id="cartCount">0</div>
+            <div>
+                <div style="font-size:0.78rem;color:var(--muted);">الإجمالي</div>
+                <div class="cart-total" id="cartTotal">0 ج.م</div>
+            </div>
+        </div>
+        <button class="send-btn" onclick="submitOrder()">إرسال الطلب 🚀</button>
+    </div>
+
+    <!-- Queue Modal -->
+    <div class="modal-overlay" id="queueModal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-title" id="queueModalTitle">سجّل في الطابور</div>
+            <input type="hidden" id="queueActivityId">
+            <div class="form-group">
+                <label class="form-label">اسمك</label>
+                <input type="text" id="queueName" class="form-control" placeholder="اسمك (اختياري)">
+            </div>
+            <div class="form-group">
+                <label class="form-label">عدد الساعات</label>
+                <select id="queueHours" class="form-control">
+                    <option value="1">ساعة واحدة</option>
+                    <option value="2">ساعتين</option>
+                    <option value="3">3 ساعات</option>
+                </select>
+            </div>
+            <button class="modal-btn" onclick="submitQueueEntry()">تأكيد الحجز</button>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    const tableUuid = '{{ table.uuid }}';
+    // cart: { productId: { qty, sizeId, sizeName, price } }
+    const cart = {};
+
+    function showToast(msg, type='success') {
+        const c = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = `toast toast-${type}`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    // ===== Category filter =====
+    function filterCat(cls, btn) {
+        document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.prod-card').forEach(el => {
+            el.style.display = (cls === 'all' || el.classList.contains(cls)) ? '' : 'none';
+        });
+        document.querySelectorAll('.cat-title').forEach(el => {
+            el.style.display = (cls === 'all' || el.classList.contains(cls)) ? '' : 'none';
+        });
+    }
+
+    // ===== Size selector =====
+    function selectSize(pid, btn) {
+        const strip = document.getElementById(`sizes-${pid}`);
+        strip.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Update cart if product already added
+        if (cart[pid]) {
+            cart[pid].sizeId = parseInt(btn.dataset.sid);
+            cart[pid].sizeName = btn.dataset.sname;
+            cart[pid].price = parseFloat(btn.dataset.sprice);
+            updateCartBar();
+        }
+
+        // Show add button after size selection
+        const qrow = document.getElementById(`qrow-${pid}`);
+        if (!cart[pid]) {
+            // First show the qty row to add
+            if (qrow.style.display === 'none') {
+                qrow.style.display = 'flex';
+                changeQty(pid, 1); // auto-add 1
+            }
+        }
+    }
+
+    // ===== Qty controls =====
+    function changeQty(pid, delta) {
+        const card = document.querySelector(`[data-pid="${pid}"]`);
+        const hasSizes = card.dataset.hasSizes === '1';
+
+        if (!cart[pid]) {
+            // Initialize
+            let price = parseFloat(card.dataset.price);
+            let sizeId = null;
+            let sizeName = '';
+
+            if (hasSizes) {
+                const activeSize = card.querySelector('.size-btn.active');
+                if (activeSize) {
+                    sizeId = parseInt(activeSize.dataset.sid);
+                    sizeName = activeSize.dataset.sname;
+                    price = parseFloat(activeSize.dataset.sprice);
+                }
+            }
+
+            cart[pid] = { qty: 0, sizeId, sizeName, price };
+        }
+
+        cart[pid].qty = Math.max(0, cart[pid].qty + delta);
+
+        const qrow = document.getElementById(`qrow-${pid}`);
+        const qn = document.getElementById(`qn-${pid}`);
+        const addBtn = document.getElementById(`addbtn-${pid}`);
+
+        if (cart[pid].qty > 0) {
+            qrow.style.display = 'flex';
+            qn.textContent = cart[pid].qty;
+            if (addBtn) addBtn.style.display = 'none';
+            card.classList.add('selected');
+        } else {
+            qrow.style.display = 'none';
+            qn.textContent = '0';
+            if (addBtn) addBtn.style.display = '';
+            card.classList.remove('selected');
+            delete cart[pid];
+        }
+
+        updateCartBar();
+    }
+
+    // ===== Cart bar =====
+    function updateCartBar() {
+        const entries = Object.values(cart);
+        const count = entries.reduce((s, v) => s + v.qty, 0);
+        const total = entries.reduce((s, v) => s + (v.price * v.qty), 0);
+
+        const bar = document.getElementById('cartBar');
+        if (count > 0) {
+            bar.classList.add('show');
+            document.getElementById('cartCount').textContent = count;
+            document.getElementById('cartTotal').textContent = `${total.toFixed(0)} ج.م`;
+        } else {
+            bar.classList.remove('show');
+        }
+    }
+
+    // ===== Submit Order =====
+    async function submitOrder() {
+        const items = Object.entries(cart).map(([pid, v]) => {
+            const item = { product_id: parseInt(pid), quantity: v.qty };
+            if (v.sizeId) item.size_id = v.sizeId;
+            return item;
+        });
+
+        if (items.length === 0) return;
+
+        try {
+            const res = await fetch('/api/orders/create/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    table_uuid: tableUuid,
+                    items: items,
+                    is_from_qr: true,
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || 'تم إرسال طلبك بنجاح! ✓');
+                // Reset cart
+                Object.keys(cart).forEach(k => delete cart[k]);
+                document.querySelectorAll('.qty-num').forEach(el => el.textContent = '0');
+                document.querySelectorAll('.qty-row').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.prod-card').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('[id^="addbtn-"]').forEach(el => el.style.display = '');
+                updateCartBar();
+            } else {
+                showToast(data.error || 'خطأ', 'error');
+            }
+        } catch (e) {
+            showToast('حدث خطأ في الاتصال', 'error');
+        }
+    }
+
+    // ===== Queue =====
+    function joinQueue(activityId, name) {
+        document.getElementById('queueActivityId').value = activityId;
+        document.getElementById('queueModalTitle').textContent = `حجز ${name}`;
+        document.getElementById('queueModal').classList.add('active');
+    }
+
+    async function submitQueueEntry() {
+        const data = {
+            activity_type_id: parseInt(document.getElementById('queueActivityId').value),
+            customer_name: document.getElementById('queueName').value,
+            requested_hours: parseFloat(document.getElementById('queueHours').value),
+        };
+        try {
+            const res = await fetch('/api/queue/join/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast(result.message || 'تم التسجيل بنجاح!');
+                document.getElementById('queueModal').classList.remove('active');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('خطأ', 'error');
+            }
+        } catch (e) {
+            showToast('خطأ في الاتصال', 'error');
+        }
+    }
+    </script>
+</body>
+</html>

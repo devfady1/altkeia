@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}تقرير يومي{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">📅 تقرير يوم {{ report_date|date:"j F Y" }}</h1>
+    <form class="d-flex gap-1" style="gap:8px;">
+        <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" class="form-control" style="width:auto;"
+            onchange="this.form.submit()">
+    </form>
+</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">💰</div>
+        <div>
+            <div class="stat-value">{{ total_revenue }} ج.م</div>
+            <div class="stat-label">الإيرادات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">🪑</div>
+        <div>
+            <div class="stat-value">{{ sessions_count }}</div>
+            <div class="stat-label">الجلسات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">🎮</div>
+        <div>
+            <div class="stat-value">{{ activities_revenue }} ج.م</div>
+            <div class="stat-label">إيرادات الأنشطة</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">🎯</div>
+        <div>
+            <div class="stat-value">{{ activities_count }}</div>
+            <div class="stat-label">جلسات نشاط</div>
+        </div>
+    </div>
+</div>
+{% if sessions %}
+<div class="card">
+    <h3 class="card-title mb-2">الجلسات المغلقة</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الطاولة</th>
+                <th>الوقت</th>
+                <th>الإجمالي</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td>{{ s.pk }}</td>
+                <td>{{ s.primary_table.display_name }}</td>
+                <td>{{ s.opened_at|time:"H:i" }} - {{ s.closed_at|time:"H:i" }}</td>
+                <td class="text-success fw-bold">{{ s.total_amount }} ج.م</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

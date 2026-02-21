@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}الطابور{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">⏳ الطابور</h1>
+</div>
+{% for activity_type, entries in queues.items %}
+<div class="card mb-2">
+    <div class="card-header">
+        <h3 class="card-title">{{ activity_type.icon }} {{ activity_type.name }}</h3>
+        <span class="badge {% if entries %}badge-warning{% else %}badge-success{% endif %}">{{ entries|length }}
+            منتظر</span>
+    </div>
+    {% for entry in entries %}
+    <div class="order-item">
+        <div class="order-item-qty">{{ entry.position }}</div>
+        <div class="order-item-info">
+            <div class="order-item-name">{{ entry.customer_name|default:"عميل" }}</div>
+            <div class="order-item-notes">{{ entry.requested_hours }} ساعة</div>
+        </div>
+        <div>
+            <form method="post" action="{% url 'activate_queue' entry.pk %}" style="display:inline;">{% csrf_token
+                %}<button class="btn btn-success btn-sm">▶ تشغيل</button></form>
+            <form method="post" action="{% url 'cancel_queue' entry.pk %}" style="display:inline;">{% csrf_token
+                %}<button class="btn btn-danger btn-sm">✕</button></form>
+        </div>
+    </div>
+    {% empty %}
+    <p class="text-muted text-center" style="padding:16px;">لا يوجد منتظرون</p>
+    {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}إدارة الأجهزة{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🎮 إدارة الأجهزة والأنشطة</h1><a href="{% url 'manage' %}" class="btn btn-ghost btn-sm">←
+        رجوع</a>
+</div>
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة نوع نشاط</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add_type">
+        <input type="text" name="name" placeholder="اسم النشاط" class="form-control" style="flex:1;min-width:150px;"
+            required>
+        <input type="number" name="price_per_hour" placeholder="سعر الساعة" class="form-control" style="width:130px;"
+            step="0.5" required>
+        <input type="text" name="icon" placeholder="أيقونة" class="form-control" style="width:80px;" value="🎮">
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+<div class="card mb-2">
+    <h3 class="card-title mb-2">إضافة جهاز</h3>
+    <form method="post" class="d-flex gap-1" style="gap:12px;flex-wrap:wrap;">
+        {% csrf_token %}<input type="hidden" name="action" value="add_device">
+        <select name="activity_type" class="form-control" style="width:160px;" required>
+            <option value="">نوع النشاط</option>
+            {% for at in activity_types %}<option value="{{ at.pk }}">{{ at.name }}</option>{% endfor %}
+        </select>
+        <input type="text" name="name" placeholder="اسم الجهاز" class="form-control" style="flex:1;min-width:150px;"
+            required>
+        <button type="submit" class="btn btn-primary">➕ إضافة</button>
+    </form>
+</div>
+{% for at in activity_types %}
+<div class="card mb-2">
+    <div class="card-header">
+        <h3 class="card-title">{{ at.icon }} {{ at.name }} <span class="text-muted" style="font-size:0.85rem;">({{
+                at.price_per_hour }} ج.م/ساعة)</span></h3>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>الجهاز</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for device in at.devices.all %}
+            <tr>
+                <td class="fw-bold">{{ device.name }}</td>
+                <td><span
+                        class="badge {% if device.status == 'available' %}badge-success{% elif device.status == 'busy' %}badge-danger{% else %}badge-warning{% endif %}">{{
+                        device.get_status_display }}</span></td>
+                <td>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('حذف؟')">{% csrf_token %}<input
+                            type="hidden" name="action" value="delete_device"><input type="hidden" name="id"
+                            value="{{ device.pk }}"><button class="btn btn-danger btn-sm">🗑</button></form>
+                </td>
+            </tr>
+            {% empty %}<tr>
+                <td colspan="3" class="text-muted text-center">لا توجد أجهزة</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endblock %}
