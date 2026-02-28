@@ -33,8 +33,7 @@
 {% for at in activity_types %}
 <div class="card mb-2">
     <div class="card-header">
-        <h3 class="card-title">{{ at.icon }} {{ at.name }} <span class="text-muted" style="font-size:0.85rem;">({{
-                at.price_per_hour }} ج.م/ساعة)</span></h3>
+        <h3 class="card-title">{{ at.icon }} {{ at.name }} <span class="text-muted" style="font-size:0.85rem;">({{ at.price_per_hour }} ج.م/ساعة)</span></h3>
     </div>
     <table class="data-table">
         <thead>
