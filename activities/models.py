@@ -82,15 +82,19 @@ class ActivitySession(models.Model):
 
     @property
     def running_cost(self):
-        """التكلفة الحالية"""
-        hours = Decimal(str(math.ceil(self.duration_minutes / 60)))
-        return hours * self.device.activity_type.price_per_hour
+        """التكلفة الحالية (بالدقيقة)"""
+        # حساب سعر الدقيقة من سعر الساعة
+        price_per_minute = self.device.activity_type.price_per_hour / Decimal('60')
+        # الحد الأدنى دقيقة واحدة
+        minutes = Decimal(max(1, self.duration_minutes))
+        return (minutes * price_per_minute).quantize(Decimal('0.01'))
 
     def end_activity(self):
-        """إنهاء النشاط وحساب السعر"""
+        """إنهاء النشاط وحساب السعر العادل بالدقيقة"""
         self.ended_at = timezone.now()
-        hours = Decimal(str(math.ceil(self.duration_minutes / 60)))
-        self.total_price = hours * self.device.activity_type.price_per_hour
+        price_per_minute = self.device.activity_type.price_per_hour / Decimal('60')
+        minutes = Decimal(max(1, self.duration_minutes))
+        self.total_price = (minutes * price_per_minute).quantize(Decimal('0.01'))
         self.save()
         # تحرير الجهاز
         self.device.status = Device.Status.AVAILABLE

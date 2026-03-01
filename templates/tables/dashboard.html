@@ -2,6 +2,180 @@
 
 {% block title %}لوحة التحكم - الكافيه{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Split-Pane Order UI */
+    .order-split-panel {
+        display: flex;
+        flex-direction: column;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+    .order-split-container {
+        display: grid;
+        grid-template-columns: 200px 1fr 320px;
+        height: calc(100vh - 70px);
+        overflow: hidden;
+    }
+    
+    /* Categories Sidebar */
+    .order-cat-sidebar {
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        overflow-y: auto;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .order-cat-btn {
+        width: 100%;
+        padding: 12px 15px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text-main);
+        text-align: right;
+        font-family: var(--font);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .order-cat-btn:hover { background: rgba(255,255,255,0.05); }
+    .order-cat-btn.active {
+        background: var(--accent-primary);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* Product Grid */
+    .order-product-grid-container {
+        overflow-y: auto;
+        padding: 20px;
+        background: var(--bg-main);
+    }
+    .order-product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+    }
+    .order-product-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 15px;
+        transition: transform 0.2s, border-color 0.2s;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .order-product-card:hover { 
+        transform: translateY(-2px);
+        border-color: var(--accent-primary);
+    }
+    .product-name { font-weight: bold; font-size: 1.1rem; }
+    .product-price { color: var(--success); font-weight: bold; }
+    
+    .size-buttons-row {
+        display: flex;
+        gap: 5px;
+        margin: 10px 0;
+        flex-wrap: wrap;
+    }
+    .qty-control {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        background: rgba(0,0,0,0.1);
+        border-radius: var(--radius-pill);
+        padding: 5px;
+    }
+    .qty-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        background: var(--bg-main);
+        color: var(--text-main);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+    .qty-btn:hover { background: var(--accent-primary); color: white; }
+    .qty-value { font-weight: bold; font-size: 1.1rem; min-width: 25px; text-align: center; }
+
+    /* Bill Sidebar */
+    .order-bill-sidebar {
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border-color);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .order-cart-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+    .cart-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .cart-item-main { display: flex; flex-direction: column; flex: 1; }
+    .cart-item-notes {
+        border: none;
+        border-bottom: 1px dashed var(--border-color);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        padding: 4px 0;
+        width: 100%;
+        margin-top: 5px;
+        font-family: var(--font);
+    }
+    .cart-item-notes:focus {
+        outline: none;
+        border-bottom-color: var(--accent-primary);
+        color: var(--text-main);
+    }
+
+    /* Search Box */
+    .search-box-container input {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        padding: 10px 20px;
+        font-size: 1.1rem;
+        border-radius: var(--radius-pill) !important;
+    }
+    .search-box-container input:focus {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.1);
+    }
+
+    @media (max-width: 992px) {
+        .order-split-container {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+        .order-cat-sidebar {
+            flex-direction: row;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .order-cat-btn { width: auto; }
+        .order-split-panel { width: 95% !important; height: 95vh !important; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -31,7 +205,7 @@
 <div class="tables-grid floor-content {% if not forloop.first %}hidden{% endif %}" data-floor="{{ floor.pk }}">
     {% for table in floor.tables.all %}
     <div class="table-card fade-in" data-status="{{ table.status }}" data-table-id="{{ table.pk }}"
-        onclick="openTablePanel({{ table.pk }}, '{{ table.display_name }}', '{{ table.status }}', '{{ table.uuid }}')">
+        onclick="openTablePanel(this, {{ table.pk }}, '{{ table.display_name }}', '{{ table.uuid }}')">
         <div class="table-number">{{ table.number }}</div>
         <div class="table-name">{{ table.display_name }}</div>
         <span class="table-status-badge {{ table.status }}">{{ table.get_status_display }}</span>
@@ -45,7 +219,7 @@
 </div>
 {% endfor %}
 
-<!-- Side Panel -->
+<!-- Side Panel (Standard) -->
 <div class="side-panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
 <div class="side-panel" id="sidePanel">
     <div class="panel-header">
@@ -66,6 +240,46 @@
     </div>
 </div>
 
+<!-- Full-Screen Order Search/Add UI (Splitted) -->
+<div class="side-panel-overlay" id="orderOverlay" style="z-index: 1100;" onclick="closeOrderPanel()"></div>
+<div class="side-panel order-split-panel" id="orderPanel" style="width: 85%; max-width: 1200px; z-index: 1101;">
+    <div class="panel-header">
+        <h3>📋 إضافة طلب جديد</h3>
+        <div class="search-box-container" style="flex: 1; margin: 0 20px;">
+            <input type="text" id="productSearch" class="form-control" placeholder="🔍 ابحث عن صنف (Ctrl+F)..." oninput="filterProducts()">
+        </div>
+        <button class="panel-close" onclick="closeOrderPanel()">✕</button>
+    </div>
+    <div class="order-split-container">
+        <!-- Categories Sidebar -->
+        <aside class="order-cat-sidebar" id="orderCatSidebar">
+            <!-- Dynamic categories -->
+        </aside>
+        
+        <!-- Products Grid -->
+        <main class="order-product-grid-container">
+            <div class="order-product-grid" id="orderProductGrid">
+                <!-- Dynamic products -->
+            </div>
+        </main>
+        
+        <!-- Live Bill / Cart -->
+        <aside class="order-bill-sidebar">
+            <h4 style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🧾 الفاتورة الحالية</h4>
+            <div id="orderCartItems" class="order-cart-list">
+                <!-- Dynamic cart items -->
+            </div>
+            <div class="order-cart-summary">
+                <div class="d-flex justify-between fw-bold" style="font-size: 1.2rem; margin-top: 15px; padding-top: 15px; border-top: 2px solid var(--border-color);">
+                    <span>الإجمالي</span>
+                    <span id="orderCartTotal" class="text-success">0 ج.م</span>
+                </div>
+                <button class="btn btn-success btn-block btn-lg mt-2" onclick="submitOrder()">📤 تأكيد الأوردر (Enter)</button>
+            </div>
+        </aside>
+    </div>
+</div>
+
 <!-- Modal for new session / merge -->
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
@@ -82,6 +296,10 @@
 
 {% block extra_js %}
 <script>
+    // Role-based permissions for JS
+    window.isManager = {% if request.user.is_manager %}true{% else %}false{% endif %};
+    window.isOwner = {% if request.user.is_owner %}true{% else %}false{% endif %};
+
     // Floor tabs
     document.querySelectorAll('.floor-tab').forEach(tab => {
         tab.addEventListener('click', function () {
@@ -96,9 +314,11 @@
     let currentTableUuid = null;
     let currentSessionId = null;
 
-    function openTablePanel(tableId, tableName, status, uuid) {
+    function openTablePanel(el, tableId, tableName, uuid) {
         currentTableId = tableId;
         currentTableUuid = uuid;
+        const status = el.getAttribute('data-status'); // Get current status from DOM
+        
         document.getElementById('panelTitle').textContent = tableName;
         document.getElementById('panelOverlay').classList.add('active');
         document.getElementById('sidePanel').classList.add('active');
@@ -134,15 +354,40 @@
     `;
         document.getElementById('panelTotal').textContent = '0 ج.م';
         document.getElementById('panelActions').innerHTML = `
-        <form method="post" action="/sessions/open/${tableId}/" style="width:100%">
-            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+        <div style="width:100%">
             <div class="form-group">
                 <label class="form-label">عدد الضيوف</label>
-                <input type="number" name="guest_count" value="1" min="1" class="form-control">
+                <input type="number" id="guestCount" value="1" min="1" class="form-control">
             </div>
-            <button type="submit" class="btn btn-success btn-block">🟢 فتح جلسة</button>
-        </form>
+            <button class="btn btn-success btn-block" onclick="openSession(${tableId})">🟢 فتح جلسة</button>
+        </div>
     `;
+    }
+
+    async function openSession(tableId) {
+        const guestCount = document.getElementById('guestCount').value;
+        const result = await apiPost(`/api/sessions/open/`, { 
+            table_id: tableId, 
+            guest_count: guestCount 
+        });
+        
+        if (result.success) {
+            showToast('تم فتح الجلسة بنجاح');
+            // Update table card status in grid
+            const tableCard = document.querySelector(`.table-card[data-table-id="${tableId}"]`);
+            if (tableCard) {
+                tableCard.setAttribute('data-status', 'occupied');
+                const badge = tableCard.querySelector('.table-status-badge');
+                if (badge) {
+                    badge.className = 'table-status-badge occupied';
+                    badge.textContent = 'مشغولة';
+                }
+            }
+            // Load details
+            loadSessionDetails(tableId);
+        } else {
+            showToast(result.error || 'خطأ في فتح الجلسة', 'error');
+        }
     }
 
     function copyQrLink() {
@@ -160,10 +405,23 @@
                 const session = await res.json();
                 currentSessionId = session.id;
                 renderSessionPanel(session);
+            } else if (res.status === 404) {
+                const errData = await res.json();
+                console.error('Session Error:', errData);
+                // If table is supposed to be occupied but no session found
+                body.innerHTML = `
+                    <div style="text-align:center;padding:40px 0;">
+                        <div style="font-size:3rem;margin-bottom:16px;">⚠️</div>
+                        <p style="color:var(--danger);margin-bottom:10px;font-weight:bold;">خطأ: لم يتم العثور على جلسة نشطة</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:20px;">الطاولة مسجلة كـ "${errData.table_status || 'مشغولة'}" لكن لا توجد جلسة مرتبطة بها في النظام.</p>
+                        <button class="btn btn-warning btn-sm" onclick="showEmptyTablePanel(${tableId}, '')">🔄 عرض خيارات الطاولة الفارغة</button>
+                    </div>
+                `;
             } else {
                 showEmptyTablePanel(tableId, '');
             }
         } catch (e) {
+            console.error('Fetch Error:', e);
             showEmptyTablePanel(tableId, '');
         }
     }
@@ -196,12 +454,19 @@
                         <span class="text-muted">إجمالي الطلب</span>
                         <span class="fw-bold">${order.total} ج.م</span>
                     </div>
-                    ${order.status === 'pending' ? `
-                        <button class="btn btn-success btn-sm btn-block mt-1" onclick="updateOrderStatus(${order.id}, 'confirmed')">✓ تأكيد الطلب</button>
-                    ` : ''}
-                    ${order.status === 'ready' ? `
-                        <button class="btn btn-info btn-sm btn-block mt-1" onclick="updateOrderStatus(${order.id}, 'delivered')">📦 تم التوصيل</button>
-                    ` : ''}
+                    <div class="d-flex gap-1 mt-1" style="gap:5px;">
+                        ${(window.isManager || window.isOwner) ? `
+                        <button class="btn btn-primary btn-sm btn-block" onclick='editOrderItems(${order.id}, ${JSON.stringify(order.items.map(i => ({id:i.id, name:i.product, qty:i.quantity})))})'>📝 تعديل الأصناف</button>
+                        ` : ''}
+                        
+                        ${order.status === 'pending' ? `
+                            <button class="btn btn-success btn-sm btn-block" onclick="updateOrderStatus(${order.id}, 'confirmed')">✓ تأكيد</button>
+                        ` : ''}
+                        
+                        ${order.status === 'delivered' ? `
+                             <span class="badge badge-success" style="width:100%; justify-content:center;">✓ تم التوصيل</span>
+                        ` : ''}
+                    </div>
                 </div>
             `;
             });
@@ -256,9 +521,8 @@
         ` : ''}
     `;
 
-        document.getElementById('panelTotal').textContent = `${session.total_amount} ج.م`;
         document.getElementById('panelActions').innerHTML = `
-        <button class="btn btn-primary" onclick="showOrderModal()">📋 إضافة طلب</button>
+        <button class="btn btn-primary" onclick="openOrderUI()">📋 إضافة طلب</button>
         <button class="btn btn-success" onclick="showPaymentModal(${session.id}, ${session.total_amount})">💰 دفع</button>
         <button class="btn btn-info" onclick="showMergeModal(${session.id})">🔗 دمج</button>
         <button class="btn btn-ghost" onclick="showActivityModal(${session.id})">🎮 نشاط</button>
@@ -268,127 +532,180 @@
     // ===== ORDER CREATION =====
     let orderCart = {};
 
-    async function showOrderModal() {
-        document.getElementById('modalTitle').textContent = '📋 إضافة طلب';
-        document.getElementById('modalBody').innerHTML = '<div style="text-align:center;padding:20px;"><div class="text-muted">جارٍ تحميل المنتجات...</div></div>';
-        document.getElementById('modalFooter').innerHTML = '';
-        document.getElementById('modalOverlay').classList.add('active');
+    // ===== NEW SPLIT-PANE ORDER UI =====
+    let fullMenuData = null;
+    let currentCategoryId = null;
+
+    async function openOrderUI() {
+        document.getElementById('orderOverlay').classList.add('active');
+        document.getElementById('orderPanel').classList.add('active');
+        document.getElementById('productSearch').value = '';
         orderCart = {};
         window._productData = {};
+        
+        // Auto-focus search on desktop
+        setTimeout(() => document.getElementById('productSearch').focus(), 300);
 
-        try {
+        if (!fullMenuData) {
             const res = await fetch('/api/products/');
-            const data = await res.json();
+            fullMenuData = await res.json();
+        }
+        
+        renderOrderUI();
+    }
 
-            if (!data.categories || data.categories.length === 0) {
-                document.getElementById('modalBody').innerHTML = `
-                    <div style="text-align:center;padding:30px;color:var(--text-muted);">
-                        <div style="font-size:2rem;margin-bottom:8px;">📦</div>
-                        <p>لا توجد منتجات. <a href="/manage/products/" style="color:var(--accent-primary);">أضف منتجات</a></p>
-                    </div>`;
-                return;
-            }
+    function closeOrderPanel() {
+        document.getElementById('orderOverlay').classList.remove('active');
+        document.getElementById('orderPanel').classList.remove('active');
+    }
 
-            let tabsHtml = '<div class="floor-tabs" style="margin-bottom:12px;flex-wrap:wrap;">';
-            let productsHtml = '';
+    function renderOrderUI() {
+        if (!fullMenuData || !fullMenuData.categories) return;
 
-            data.categories.forEach((cat, idx) => {
-                tabsHtml += `<button class="floor-tab ${idx === 0 ? 'active' : ''}" onclick="switchOrderCategory(this, '${cat.id}')">${cat.icon} ${cat.name}</button>`;
-                productsHtml += `<div class="order-category-panel ${idx > 0 ? 'hidden' : ''}" data-cat-id="${cat.id}">`;
+        // Render Sidebar
+        let sidebarHtml = '';
+        fullMenuData.categories.forEach((cat, idx) => {
+            if (idx === 0 && !currentCategoryId) currentCategoryId = cat.id;
+            sidebarHtml += `<button class="order-cat-btn ${currentCategoryId == cat.id ? 'active' : ''}" 
+                                   onclick="switchOrderCategory('${cat.id}')">
+                                   ${cat.icon} ${cat.name}
+                            </button>`;
+        });
+        document.getElementById('orderCatSidebar').innerHTML = sidebarHtml;
 
+        // Render Products
+        renderProductGrid();
+        updateCartDisplay();
+    }
+
+    function switchOrderCategory(catId) {
+        currentCategoryId = catId;
+        renderOrderUI();
+    }
+
+    function renderProductGrid(filter = '') {
+        let gridHtml = '';
+        const lowerFilter = filter.toLowerCase();
+
+        fullMenuData.categories.forEach(cat => {
+            // Show all products if filtering, otherwise only current category
+            if (filter || cat.id == currentCategoryId) {
                 cat.products.forEach(p => {
+                    if (filter && !p.name.toLowerCase().includes(lowerFilter)) return;
+                    
                     window._productData[p.id] = p;
                     let sizesHtml = '';
                     if (p.has_sizes && p.sizes.length > 0) {
-                        sizesHtml = '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">';
+                        sizesHtml = '<div class="size-buttons-row">';
                         p.sizes.forEach((s, si) => {
-                            sizesHtml += `<button class="btn btn-sm ${si===0?'btn-primary':'btn-ghost'}" 
-                                style="font-size:0.75rem;padding:4px 10px;min-height:28px;" 
-                                onclick="selectOrderSize(${p.id},${s.id},${s.price},this)"
-                                data-sid="${s.id}" data-sprice="${s.price}">
-                                ${s.name} (${s.price} ج.م)
-                            </button>`;
+                            const isSelected = orderCart[p.id] && orderCart[p.id].sizeId == s.id;
+                            sizesHtml += `<button class="btn btn-xs ${isSelected ? 'btn-primary' : 'btn-ghost'}" 
+                                            onclick="selectOrderSize(${p.id}, ${s.id}, ${s.price}, this)">
+                                            ${s.name}
+                                          </button>`;
                         });
                         sizesHtml += '</div>';
                     }
 
-                    productsHtml += `
-                    <div class="order-product-item" style="padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);margin-bottom:6px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;">
-                            <div>
-                                <div class="fw-bold">${p.name}</div>
-                                <div class="text-muted" style="font-size:0.8rem;">${p.has_sizes ? 'ابتداءً من ' : ''}${p.price} ج.م</div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <button class="btn btn-ghost btn-sm" onclick="changeQty(${p.id}, -1)" style="width:32px;height:32px;padding:0;">−</button>
-                                <span id="qty-${p.id}" class="fw-bold" style="min-width:20px;text-align:center;">0</span>
-                                <button class="btn btn-primary btn-sm" onclick="changeQty(${p.id}, 1)" style="width:32px;height:32px;padding:0;">+</button>
-                            </div>
+                    gridHtml += `
+                    <div class="order-product-card" data-pid="${p.id}">
+                        <div class="d-flex justify-between align-center">
+                            <span class="product-name">${p.name}</span>
+                            <span class="product-price">${p.price} ج.م</span>
                         </div>
                         ${sizesHtml}
+                        <div class="qty-control mt-1">
+                            <button class="qty-btn" onclick="changeQty(${p.id}, -1)">−</button>
+                            <span id="qty-${p.id}" class="qty-value">${orderCart[p.id] ? orderCart[p.id].qty : 0}</span>
+                            <button class="qty-btn" onclick="changeQty(${p.id}, 1)">+</button>
+                        </div>
                     </div>`;
                 });
-                productsHtml += '</div>';
-            });
-            tabsHtml += '</div>';
+            }
+        });
 
-            document.getElementById('modalBody').innerHTML = tabsHtml + productsHtml;
-            document.getElementById('modalFooter').innerHTML = `
-                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
-                    <div>
-                        <span class="text-muted">الإجمالي: </span>
-                        <span id="orderCartTotal" class="fw-bold text-success">0 ج.م</span>
-                    </div>
-                    <button class="btn btn-success" onclick="submitOrder()">📤 إرسال الطلب</button>
-                </div>`;
-        } catch (e) {
-            document.getElementById('modalBody').innerHTML = '<p class="text-danger text-center">خطأ في تحميل المنتجات</p>';
-        }
+        document.getElementById('orderProductGrid').innerHTML = gridHtml || '<div class="text-muted p-3">لم يتم العثور على نتائج</div>';
     }
 
-    function switchOrderCategory(btn, catId) {
-        btn.parentNode.querySelectorAll('.floor-tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.order-category-panel').forEach(p => p.classList.add('hidden'));
-        document.querySelector(`.order-category-panel[data-cat-id="${catId}"]`).classList.remove('hidden');
+    function filterProducts() {
+        const val = document.getElementById('productSearch').value;
+        renderProductGrid(val);
     }
 
     function selectOrderSize(pid, sizeId, sizePrice, btn) {
-        // Highlight selected size
-        btn.parentNode.querySelectorAll('.btn').forEach(b => {
-            b.className = b.className.replace('btn-primary', 'btn-ghost');
-        });
-        btn.className = btn.className.replace('btn-ghost', 'btn-primary');
-
-        // Update cart entry if exists
-        if (orderCart[pid]) {
+        // Update in-memory data
+        if (!orderCart[pid]) {
+            orderCart[pid] = { qty: 1, sizeId, price: sizePrice };
+        } else {
             orderCart[pid].sizeId = sizeId;
             orderCart[pid].price = sizePrice;
-            updateOrderTotal();
         }
+        
+        // Update Visuals
+        btn.parentNode.querySelectorAll('button').forEach(b => b.className = 'btn btn-xs btn-ghost');
+        btn.className = 'btn btn-xs btn-primary';
+        
+        updateOrderTotal();
+        updateCartDisplay();
     }
 
-    function changeQty(productId, delta) {
-        if (!orderCart[productId]) {
-            const pData = window._productData[productId];
-            let price = pData.price;
-            let sizeId = null;
-            if (pData.has_sizes && pData.sizes.length > 0) {
-                // Default to first size
-                sizeId = pData.sizes[0].id;
-                price = pData.sizes[0].price;
-            }
-            orderCart[productId] = { qty: 0, sizeId, price };
+    function changeQty(pid, delta) {
+        if (!orderCart[pid]) {
+            const pData = window._productData[pid];
+            orderCart[pid] = { 
+                qty: 0, 
+                sizeId: (pData.has_sizes ? pData.sizes[0].id : null), 
+                price: (pData.has_sizes ? pData.sizes[0].price : pData.price) 
+            };
         }
+        orderCart[pid].qty = Math.max(0, orderCart[pid].qty + delta);
+        if (orderCart[pid].qty === 0) delete orderCart[pid];
 
-        orderCart[productId].qty = Math.max(0, orderCart[productId].qty + delta);
-        if (orderCart[productId].qty === 0) {
-            delete orderCart[productId];
-        }
-
-        const qtyEl = document.getElementById(`qty-${productId}`);
-        qtyEl.textContent = orderCart[productId] ? orderCart[productId].qty : 0;
+        // Update display in grid
+        const qtyEl = document.getElementById(`qty-${pid}`);
+        if (qtyEl) qtyEl.textContent = orderCart[pid] ? orderCart[pid].qty : 0;
+        
         updateOrderTotal();
+        updateCartDisplay();
+    }
+
+    function updateCartDisplay() {
+        const container = document.getElementById('orderCartItems');
+        let html = '';
+        let total = 0;
+
+        for (const [pid, item] of Object.entries(orderCart)) {
+            const p = window._productData[pid];
+            let sizeName = '';
+            if (item.sizeId && p.sizes) {
+                const s = p.sizes.find(sz => sz.id == item.sizeId);
+                if (s) sizeName = ` (${s.name})`;
+            }
+
+            html += `
+            <div class="cart-item" style="flex-direction: column; align-items: flex-start; gap: 5px;">
+                <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                    <div class="cart-item-main">
+                        <span class="fw-bold">${p.name}${sizeName}</span>
+                        <span class="text-muted">x${item.qty}</span>
+                    </div>
+                    <span class="fw-bold">${(item.price * item.qty).toFixed(0)} ج.م</span>
+                </div>
+                <input type="text" class="cart-item-notes" placeholder="📝 ملاحظات (اختياري)..." 
+                       value="${item.notes || ''}" 
+                       oninput="updateItemNote(${pid}, this.value)">
+            </div>`;
+            total += item.price * item.qty;
+        }
+
+        container.innerHTML = html || '<div class="text-muted text-center p-3">السلة فارغة</div>';
+        document.getElementById('orderCartTotal').textContent = `${total.toFixed(0)} ج.م`;
+    }
+
+    function updateItemNote(pid, note) {
+        if (orderCart[pid]) {
+            orderCart[pid].notes = note;
+        }
     }
 
     function updateOrderTotal() {
@@ -396,45 +713,63 @@
         for (const [pid, v] of Object.entries(orderCart)) {
             total += v.price * v.qty;
         }
-        const el = document.getElementById('orderCartTotal');
-        if (el) el.textContent = `${total.toFixed(0)} ج.م`;
+        // The actual display update is handled by updateCartDisplay()
+        // This function primarily calculates the total for internal use if needed elsewhere.
+        return total;
     }
 
     async function submitOrder() {
         const items = Object.entries(orderCart).map(([pid, v]) => {
             const item = { product_id: parseInt(pid), quantity: v.qty };
             if (v.sizeId) item.size_id = v.sizeId;
+            if (v.notes) item.notes = v.notes;
             return item;
         });
+        
         if (items.length === 0) {
-            showToast('اختر منتجات أولاً', 'error');
+            showToast('السلة فارغة!', 'error');
             return;
         }
+
         const result = await apiPost('/api/orders/create/', {
             table_uuid: currentTableUuid,
             items: items,
             is_from_qr: false,
         });
+
         if (result.success) {
             showToast('تم إرسال الطلب بنجاح ✓');
-            closeModal();
-            if (result.order_id) {
-                window.open(`/orders/ticket/${result.order_id}/`, '_blank', 'width=350,height=600');
-            }
+            closeOrderPanel();
             loadSessionDetails(currentTableId);
         } else {
             showToast(result.error || 'خطأ في إنشاء الطلب', 'error');
         }
     }
 
+    // Hotkeys
+    window.addEventListener('keydown', (e) => {
+        if (document.getElementById('orderPanel').classList.contains('active')) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                // Submit order on Enter (if not in a textarea/notes)
+                if (document.activeElement.tagName !== 'TEXTAREA') {
+                    submitOrder();
+                }
+            }
+            if (e.key === 'f' && e.ctrlKey) {
+                e.preventDefault();
+                document.getElementById('productSearch').focus();
+            }
+        }
+    });
+
     // ===== ORDER STATUS =====
     async function updateOrderStatus(orderId, newStatus) {
         const result = await apiPost(`/api/orders/${orderId}/status/`, { status: newStatus });
         if (result.success) {
             showToast('تم تحديث الحالة بنجاح');
-            // Auto-print kitchen ticket when order is confirmed
+            // Auto-print kitchen ticket when order is confirmed (silent backend print)
             if (newStatus === 'confirmed') {
-                window.open(`/orders/ticket/${orderId}/`, '_blank', 'width=350,height=600');
+                // No window.open needed, print happens in backend
             }
             loadSessionDetails(currentTableId);
         } else {
@@ -453,7 +788,7 @@
     function showPaymentModal(sessionId, total) {
         document.getElementById('modalTitle').textContent = 'دفع وإغلاق الجلسة';
         document.getElementById('modalBody').innerHTML = `
-        <form id="paymentForm" method="post" action="/payments/pay/${sessionId}/" target="_blank" onsubmit="setTimeout(()=>{closeModal();location.reload();},500)">
+        <form id="paymentForm" method="post" action="/payments/pay/${sessionId}/" onsubmit="setTimeout(()=>{closeModal();location.reload();},500)">
             <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
             <div class="stat-card mb-2" style="justify-content:center;">
                 <div class="text-center">
@@ -573,13 +908,87 @@
 
     function closeModal() {
         document.getElementById('modalOverlay').classList.remove('active');
+        document.getElementById('editModal').style.display = 'none';
     }
 
-    // Auto refresh every 30s
-    setInterval(() => {
-        if (currentTableId && document.getElementById('sidePanel').classList.contains('active')) {
+    // ===== FLEXIBLE ORDER EDITING =====
+    let currentEditOrderId = null;
+    let currentEditItems = [];
+
+    function editOrderItems(orderId, items) {
+        currentEditOrderId = orderId;
+        currentEditItems = JSON.parse(JSON.stringify(items));
+        
+        document.getElementById('editOrderIdText').textContent = orderId;
+        const list = document.getElementById('editItemsList');
+        list.innerHTML = '';
+        
+        currentEditItems.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.style = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px;';
+            div.innerHTML = `
+                <div style="flex:1;"><div style="font-weight:700;">${item.name}</div></div>
+                <div class="d-flex align-center" style="gap:10px;">
+                    <button class="btn btn-sm btn-ghost" style="padding:2px 10px;" onclick="updateEditQty(${index}, -1)">-</button>
+                    <strong id="eqty-${index}">${item.qty}</strong>
+                    <button class="btn btn-sm btn-ghost" style="padding:2px 10px;" onclick="updateEditQty(${index}, 1)">+</button>
+                    <button class="btn btn-sm btn-danger" style="margin-right:10px;" onclick="removeEditItem(${index})">✕</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+        
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function updateEditQty(index, delta) {
+        currentEditItems[index].qty = Math.max(0, currentEditItems[index].qty + delta);
+        const el = document.getElementById(`eqty-${index}`);
+        if(el) el.textContent = currentEditItems[index].qty;
+    }
+
+    function removeEditItem(index) {
+        currentEditItems.splice(index, 1);
+        editOrderItems(currentEditOrderId, currentEditItems);
+    }
+
+    async function saveOrderEdits() {
+        const payload = { items: currentEditItems.map(i => ({ item_id: i.id, quantity: i.qty })) };
+        const result = await apiPost(`/api/orders/${currentEditOrderId}/edit/`, payload);
+        if (result.success) {
+            showToast(result.message || 'تم التعديل');
+            document.getElementById('editModal').style.display = 'none';
             loadSessionDetails(currentTableId);
+        } else {
+            showToast(result.error || 'خطأ', 'error');
+        }
+    }
+
+    // Auto refresh every 30s for the grid
+    setInterval(() => {
+        if (!document.getElementById('sidePanel').classList.contains('active') && 
+            !document.getElementById('modalOverlay').classList.contains('active') &&
+            document.getElementById('editModal').style.display !== 'flex') {
+            location.reload();
         }
     }, 30000);
+
+    // Auto refresh active panel every 10s
+    setInterval(() => {
+        if (document.getElementById('sidePanel').classList.contains('active') && currentTableId) {
+            loadSessionDetails(currentTableId);
+        }
+    }, 10000);
 </script>
+
+<div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="width:100%; max-width:500px; padding:25px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:20px;">
+        <h3 style="margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">📝 تعديل الطلب #<span id="editOrderIdText"></span></h3>
+        <div id="editItemsList" style="max-height:350px; overflow-y:auto; margin-bottom:20px;"></div>
+        <div class="d-flex justify-between" style="gap:10px;">
+            <button class="btn btn-ghost" onclick="document.getElementById('editModal').style.display='none'">إلغاء</button>
+            <button class="btn btn-primary" onclick="saveOrderEdits()">حفظ التغييرات ✨</button>
+        </div>
+    </div>
+</div>
 {% endblock %}

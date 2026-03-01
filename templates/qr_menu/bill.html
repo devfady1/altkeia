@@ -6,94 +6,221 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الفاتورة - {{ table.display_name }}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --card: rgba(26, 26, 46, 0.45);
+            --text: #ffffff;
+            --text2: #cbd5e1;
+            --muted: #94a3b8;
+            --accent: #ff2e63;
+            --accent-glow: rgba(255, 46, 99, 0.35);
+            --grad: linear-gradient(135deg, #ff2e63, #e91e63);
+            --success: #10b981;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --r: 20px;
+            --rs: 12px;
+            --font: 'Cairo', sans-serif;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html { direction:rtl; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            background-image: radial-gradient(circle at 0% 0%, rgba(255, 46, 99, 0.05) 0%, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .bill-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border-radius: var(--r);
+            border: 1px solid var(--glass-border);
+        }
+        .header h1 { font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; }
+        .table-name { 
+            display: inline-block;
+            padding: 4px 16px;
+            background: var(--accent-glow);
+            border-radius: 20px;
+            font-weight: 700;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .card {
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            border-radius: var(--r);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            margin-bottom: 16px;
+            animation: slideUp 0.5s ease backwards;
+            animation-delay: calc(var(--i, 0) * 0.1s);
+        }
+        @keyframes slideUp {
+            from { opacity:0; transform: translateY(20px); }
+            to { opacity:1; transform: translateY(0); }
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .order-row:last-child { border: none; margin: 0; padding: 0; }
+
+        .item-qty {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: var(--grad);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 800;
+            margin-left: 10px;
+        }
+
+        .total-box {
+            background: linear-gradient(135deg, rgba(255, 46, 99, 0.1), rgba(255, 46, 99, 0.02));
+            border-color: rgba(255, 46, 99, 0.3);
+        }
+
+        .btn-back {
+            display: block;
+            text-align: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--r);
+            color: var(--text2);
+            text-decoration: none;
+            font-weight: 700;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.1); }
+
+        .price { font-weight: 800; color: var(--success); }
+    </style>
 </head>
 
 <body>
-    <div class="qr-container">
-        <div class="qr-header">
-            <h1>📄 الفاتورة</h1>
-            <div class="qr-table-info">{{ table.display_name }}</div>
+    <div class="bill-container">
+        <div class="header">
+            <h1>📄 تفاصيل الحساب</h1>
+            <div class="table-name">{{ table.display_name }}</div>
         </div>
 
         {% if session %}
-        <div class="card mb-2">
-            <div class="d-flex justify-between mb-1">
-                <span class="text-muted">الحالة</span>
-                <span class="badge badge-info">{{ session.get_status_display }}</span>
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--muted);">حالة الجلسة</div>
+                <div style="font-weight: 800;">{{ session.get_status_display }}</div>
             </div>
-            <div class="d-flex justify-between mb-1">
-                <span class="text-muted">المدة</span>
-                <span>{{ session.duration }}</span>
+            <div style="text-align: left;">
+                <div style="font-size: 0.8rem; color: var(--muted);">المدة الحالية</div>
+                <div style="font-weight: 800;">{{ session.duration }}</div>
             </div>
         </div>
 
         {% for order in session.orders.all %}
         {% if order.status != 'cancelled' %}
-        <div class="card mb-2 fade-in">
-            <div class="d-flex justify-between mb-1">
-                <span class="fw-bold">طلب #{{ order.pk }}</span>
-                <span class="badge" style="background:{{ order.status_color }}20;color:{{ order.status_color }};">{{
-                    order.get_status_display }}</span>
+        <div class="card" style="--i: {{ forloop.counter }}">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <span style="font-weight: 800;">طلب #{{ order.pk }}</span>
+                <span class="status-badge" style="color: {{ order.status_color }}; background: {{ order.status_color }}15;">
+                    {{ order.get_status_display }}
+                </span>
             </div>
             {% for item in order.items.all %}
-            <div class="order-item">
-                <div class="order-item-qty">{{ item.quantity }}</div>
-                <div class="order-item-info">
-                    <div class="order-item-name">{{ item.product.name }}</div>
+            <div class="order-row">
+                <div style="display: flex; align-items: center;">
+                    <div class="item-qty">{{ item.quantity }}</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 0.95rem;">{{ item.product.name }}</div>
+                        {% if item.notes %}<div style="font-size: 0.75rem; color: var(--muted);">📝 {{ item.notes }}</div>{% endif %}
+                    </div>
                 </div>
-                <div class="order-item-price">{{ item.subtotal }} ج.م</div>
+                <div class="price">{{ item.subtotal }} <span style="font-size: 0.7rem;">ج.م</span></div>
             </div>
             {% endfor %}
         </div>
         {% endif %}
         {% endfor %}
 
-        {% for act in session.activity_sessions.all %}
-        <div class="card mb-2 fade-in">
-            <div class="d-flex justify-between align-center">
+        {% if session.activity_sessions.all %}
+        <div class="card">
+            <div style="font-weight: 800; margin-bottom: 15px; color: var(--muted);">🎲 الأنشطة والألعاب</div>
+            {% for act in session.activity_sessions.all %}
+            <div class="order-row">
                 <div>
-                    <div class="fw-bold">{{ act.device.name }}</div>
-                    <div class="text-muted" style="font-size:0.82rem;">{{ act.duration_display }}</div>
+                    <div style="font-weight: 700;">{{ act.device.name }}</div>
+                    <div style="font-size: 0.8rem; color: var(--muted);">{{ act.duration_display }}</div>
                 </div>
-                <div class="fw-bold text-success">{{ act.running_cost }} ج.م</div>
+                <div class="price">{{ act.running_cost }} <span style="font-size: 0.7rem;">ج.م</span></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="card total-box">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="color: var(--text2);">إجمالي الطلبات</span>
+                <span style="font-weight: 700;">{{ session.total_orders }} ج.م</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <span style="color: var(--text2);">إجمالي الألعاب</span>
+                <span style="font-weight: 700;">{{ session.total_activities }} ج.م</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                <span style="font-size: 1.2rem; font-weight: 900;">المطلوب سداده</span>
+                <span style="font-size: 1.4rem; font-weight: 900; color: var(--success);">{{ session.total_amount }} ج.م</span>
             </div>
         </div>
-        {% endfor %}
 
-        <div class="card"
-            style="background:linear-gradient(135deg, rgba(233,69,96,0.1), rgba(233,69,96,0.05));border-color:rgba(233,69,96,0.3);">
-            <div class="d-flex justify-between mb-1">
-                <span>إجمالي الطلبات</span>
-                <span>{{ session.total_orders }} ج.م</span>
-            </div>
-            <div class="d-flex justify-between mb-1">
-                <span>إجمالي الأنشطة</span>
-                <span>{{ session.total_activities }} ج.م</span>
-            </div>
-            <div style="border-top:1px solid var(--border-color);padding-top:10px;margin-top:8px;"
-                class="d-flex justify-between">
-                <span class="fw-bold" style="font-size:1.2rem;">الإجمالي</span>
-                <span class="fw-bold text-success" style="font-size:1.2rem;">{{ session.total_amount }} ج.م</span>
-            </div>
-        </div>
-
-        <a href="{% url 'qr_menu' table.uuid %}" class="btn btn-ghost btn-block" style="margin-top:16px;">
-            ← العودة للمنيو
-        </a>
+        <a href="{% url 'qr_menu' table.uuid %}" class="btn-back">← العودة للمنيو</a>
+        
         {% else %}
-        <div style="text-align:center;padding:40px 0;">
-            <div style="font-size:3rem;margin-bottom:12px;">🪑</div>
-            <p class="text-muted">لا توجد جلسة نشطة لهذه الطاولة</p>
-            <a href="{% url 'qr_menu' table.uuid %}" class="btn btn-primary mt-2">عرض المنيو</a>
+        <div class="card" style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 4rem; margin-bottom: 20px;">🪑</div>
+            <h2 style="margin-bottom: 10px;">لا توجد جلسة نشطة</h2>
+            <p style="color: var(--muted); margin-bottom: 30px;">يبدو أن الطاولة غير مشغولة حالياً أو تم إغلاق الحساب.</p>
+            <a href="{% url 'qr_menu' table.uuid %}" class="btn-back" style="background: var(--grad); color: white; border: none;">استعرض المنيو فقط</a>
         </div>
         {% endif %}
     </div>
 
     <script>
-        // Auto-refresh bill every 10s
-        setTimeout(() => location.reload(), 10000);
+        // Auto-refresh every 15s to keep bill live
+        setTimeout(() => location.reload(), 15000);
     </script>
 </body>
-
 </html>

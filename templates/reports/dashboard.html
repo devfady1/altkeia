@@ -7,38 +7,59 @@
         <p class="page-subtitle">{{ today|date:"l j F Y" }}</p>
     </div>
     <div>
-        <a href="{% url 'daily_report' %}" class="btn btn-ghost btn-sm">📅 تقرير يومي</a>
         <a href="{% url 'monthly_report' %}" class="btn btn-ghost btn-sm">📆 تقرير شهري</a>
     </div>
 </div>
 
-<div class="stats-grid">
+{% if active_shift %}
+<div class="card" style="margin-bottom:20px; border-right: 4px solid var(--success);">
+    <h3 class="card-title mb-2">🟢 الشيفت الحالي</h3>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon green">💰</div>
+            <div>
+                <div class="stat-value">{{ active_revenue|floatformat:2 }} ج.م</div>
+                <div class="stat-label">الإيرادات</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">📋</div>
+            <div>
+                <div class="stat-value">{{ active_orders }}</div>
+                <div class="stat-label">الطلبات</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon blue">🪑</div>
+            <div>
+                <div class="stat-value">{{ active_sessions }}</div>
+                <div class="stat-label">الجلسات</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid" style="margin-bottom:20px;">
     <div class="stat-card">
-        <div class="stat-icon green">💰</div>
+        <div class="stat-icon purple">📆</div>
         <div>
-            <div class="stat-value">{{ today_revenue }} ج.م</div>
-            <div class="stat-label">إيرادات اليوم</div>
+            <div class="stat-value">{{ month_revenue|floatformat:2 }} ج.م</div>
+            <div class="stat-label">إيرادات الشهر</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon blue">🪑</div>
+        <div class="stat-icon blue">⏱️</div>
         <div>
-            <div class="stat-value">{{ today_sessions_count }}</div>
-            <div class="stat-label">جلسات اليوم</div>
+            <div class="stat-value">{{ month_shifts_count }}</div>
+            <div class="stat-label">شيفتات الشهر</div>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon orange">📋</div>
         <div>
-            <div class="stat-value">{{ today_orders_count }}</div>
-            <div class="stat-label">طلبات اليوم</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon purple">📆</div>
-        <div>
-            <div class="stat-value">{{ month_revenue }} ج.م</div>
-            <div class="stat-label">إيرادات الشهر</div>
+            <div class="stat-value">{{ month_orders }}</div>
+            <div class="stat-label">طلبات الشهر</div>
         </div>
     </div>
 </div>
@@ -51,11 +72,58 @@
         <div class="chart-bar-wrapper">
             <div class="chart-value">{{ day.revenue|floatformat:0 }}</div>
             <div class="chart-bar"
-                style="height: {% if day.revenue > 0 %}{{ day.revenue|floatformat:0 }}{% else %}4{% endif %}px; max-height: 180px;">
+                style="height: {% if day.revenue > 0 %}{% if day.revenue < 10 %}10{% else %}{{ day.revenue|floatformat:0 }}{% endif %}{% else %}4{% endif %}px; max-height: 180px; transition: height 0.3s ease;">
             </div>
             <div class="chart-label">{{ day.day_name }}</div>
         </div>
         {% endfor %}
     </div>
 </div>
+
+<!-- Recent Shifts -->
+{% if recent_shifts %}
+<div class="card" style="margin-top:20px;">
+    <h3 class="card-title mb-2">⏱️ آخر الشيفتات</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الكاشير</th>
+                <th>البداية</th>
+                <th>النهاية</th>
+                <th>المدة</th>
+                <th>الإيرادات</th>
+                <th>الحالة</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in recent_shifts %}
+            <tr>
+                <td>{{ s.pk }}</td>
+                <td>{{ s.started_by.get_full_name|default:s.started_by.username }}</td>
+                <td>{{ s.started_at|date:"m/d h:i A" }}</td>
+                <td>{% if s.ended_at %}{{ s.ended_at|date:"m/d h:i A" }}{% else %}—{% endif %}</td>
+                <td>{{ s.duration }}</td>
+                <td class="text-success fw-bold">
+                    {% if s.is_active %}—{% else %}{{ s.total_revenue }} ج.م{% endif %}
+                </td>
+                <td>
+                    {% if s.is_active %}
+                    <span style="color:var(--success); font-weight:600;">🟢 نشط</span>
+                    {% else %}
+                    <span style="color:var(--text-muted);">🔴 مغلق</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not s.is_active %}
+                    <a href="{% url 'shift_report' s.pk %}" class="btn btn-ghost btn-sm">📄 التقرير</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 {% endblock %}

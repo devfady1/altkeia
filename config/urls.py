@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/', include('queue_system.api_urls')),
     path('api/', include('sessions.api_urls')),
     path('api/', include('products.api_urls')),
+    path('api/', include('payments.api_urls')),
 ]
 
 if settings.DEBUG:

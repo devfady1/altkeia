@@ -41,6 +41,17 @@ class Order(models.Model):
     )
     notes = models.TextField(blank=True, verbose_name='ملاحظات')
     is_from_qr = models.BooleanField(default=False, verbose_name='من QR')
+    shift = models.ForeignKey(
+        'reports.CashierShift',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='orders_list',
+        verbose_name='الشيفت'
+    )
+    shift_order_number = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name='رقم الطلب في الشيفت'
+    )
 
     class Meta:
         verbose_name = 'طلب'

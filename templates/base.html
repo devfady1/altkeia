@@ -26,9 +26,10 @@
                     <span class="icon">🍳</span>
                     <span>المطبخ</span>
                 </a>
-                <a href="{% url 'order_list' %}" class="nav-item {% if request.resolver_match.url_name == 'order_list' %}active{% endif %}">
+                <a href="{% url 'order_list' %}" class="nav-item {% if request.resolver_match.url_name == 'order_list' %}active{% endif %}" id="ordersNavLink">
                     <span class="icon">📋</span>
                     <span>الطلبات</span>
+                    <span id="qrBadge" class="badge badge-danger show-count" style="display:none; margin-inline-start:auto; padding:2px 6px; font-size:0.7rem; border-radius:10px; animation: pulse-red 1.5s infinite;">0</span>
                 </a>
                 <a href="{% url 'queue_list' %}" class="nav-item {% if request.resolver_match.url_name == 'queue_list' %}active{% endif %}">
                     <span class="icon">⏳</span>
@@ -38,6 +39,10 @@
                 <a href="{% url 'reports' %}" class="nav-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
                     <span class="icon">📊</span>
                     <span>التقارير</span>
+                </a>
+                <a href="{% url 'invoice_list' %}" class="nav-item {% if request.resolver_match.url_name == 'invoice_list' %}active{% endif %}">
+                    <span class="icon">🧾</span>
+                    <span>مراجعة الفواتير</span>
                 </a>
                 <a href="{% url 'manage' %}" class="nav-item {% if 'manage' in request.path %}active{% endif %}">
                     <span class="icon">⚙️</span>
@@ -71,12 +76,222 @@
 
         <!-- Main Content -->
         <main class="main-content">
+            {% if request.user.is_cashier or request.user.is_owner or request.user.is_manager %}
+            <!-- Shift Bar -->
+            <div class="shift-bar" id="shiftBar">
+                {% if active_shift %}
+                <div class="shift-bar-content shift-active">
+                    <div class="shift-info">
+                        <span class="shift-status-dot active"></span>
+                        <span class="shift-label">شيفت مفتوح</span>
+                        <span class="shift-separator">|</span>
+                        <span class="shift-detail">👤 {{ active_shift.started_by.get_full_name|default:active_shift.started_by.username }}</span>
+                        <span class="shift-separator">|</span>
+                        <span class="shift-detail">🕐 <span id="shiftTimer">{{ active_shift.duration }}</span></span>
+                    </div>
+                    <button class="btn-shift btn-shift-end" onclick="showEndShiftModal()">
+                        إنهاء الشيفت ⏹️
+                    </button>
+                </div>
+                {% else %}
+                <div class="shift-bar-content shift-inactive">
+                    <div class="shift-info">
+                        <span class="shift-status-dot inactive"></span>
+                        <span class="shift-label">لا يوجد شيفت مفتوح</span>
+                    </div>
+                    <button class="btn-shift btn-shift-start" onclick="startShift()">
+                        بدء شيفت ▶️
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% block content %}{% endblock %}
         </main>
     </div>
     {% endblock %}
 
+    <!-- End Shift Confirmation Modal (Body level for best z-index) -->
+    {% if request.user.is_cashier or request.user.is_owner or request.user.is_manager %}
+    <div class="shift-modal-overlay" id="endShiftModal" style="display:none; z-index: 1000000;">
+        <div class="shift-modal-box">
+            <div class="modal-header">
+                <h3>⚠️ تأكيد إنهاء الشيفت</h3>
+            </div>
+            <div class="modal-body">
+                <p>هل أنت متأكد من إنهاء الشيفت الحالي؟</p>
+                <p style="color:var(--text-muted); font-size:0.9rem;">سيتم حساب إجماليات الشيفت وإغلاقه نهائياً.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="hideEndShiftModal()">إلغاء</button>
+                <button class="btn btn-danger" id="confirmEndShiftBtn" onclick="endShift()">تأكيد الإنهاء</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="toast-container" id="toastContainer"></div>
+
+
+    <style>
+    @keyframes pulse-red {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+    }
+
+    /* ===== Shift Bar ===== */
+    .shift-bar {
+        margin: -20px -20px 20px -20px;
+        padding: 0;
+    }
+    .shift-bar-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 20px;
+        border-radius: 0 0 12px 12px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .shift-active {
+        background: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(39, 174, 96, 0.08));
+        border-bottom: 2px solid var(--success, #2ecc71);
+    }
+    .shift-inactive {
+        background: linear-gradient(135deg, rgba(241, 196, 15, 0.12), rgba(243, 156, 18, 0.06));
+        border-bottom: 2px solid var(--warning, #f39c12);
+    }
+    .shift-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .shift-status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .shift-status-dot.active {
+        background: #2ecc71;
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+        animation: pulse-green 2s infinite;
+    }
+    .shift-status-dot.inactive {
+        background: #f39c12;
+    }
+    @keyframes pulse-green {
+        0%, 100% { box-shadow: 0 0 4px rgba(46, 204, 113, 0.4); }
+        50% { box-shadow: 0 0 12px rgba(46, 204, 113, 0.8); }
+    }
+    .shift-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+    }
+    .shift-separator {
+        color: var(--text-muted);
+        opacity: 0.4;
+    }
+    .shift-detail {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    .btn-shift {
+        padding: 6px 16px;
+        border: none;
+        border-radius: 8px;
+        font-family: var(--font);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-shift-start {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        color: #fff;
+    }
+    .btn-shift-start:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+    }
+    .btn-shift-end {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: #fff;
+    }
+    .btn-shift-end:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+    }
+
+    /* ===== Generic Modals (Used by various pages) ===== */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .modal-overlay.active {
+        display: flex;
+    }
+    .modal-box {
+        background: var(--bg-card, #1e1e2e);
+        border-radius: 16px;
+        padding: 24px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    }
+
+    /* ===== Shift Specific Modal ===== */
+    .shift-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000000;
+        padding: 20px;
+    }
+    .shift-modal-box {
+        background: var(--bg-card, #16213e);
+        border-radius: 20px;
+        padding: 30px;
+        width: 100%;
+        max-width: 450px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+        animation: modalSlide 0.3s ease-out;
+    }
+    @keyframes modalSlide {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header h3 {
+        margin: 0 0 12px 0;
+        font-size: 1.1rem;
+    }
+    .modal-body p {
+        margin: 0 0 8px 0;
+        line-height: 1.6;
+    }
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+    </style>
 
     <script>
     // ===== Theme Toggle =====
@@ -137,7 +352,131 @@
         const res = await fetch(url);
         return res.json();
     }
+
+    // ===== Shift Management =====
+    let shiftTimerSeconds = parseInt("{{ active_shift.duration_seconds|default:'0' }}");
+    let shiftTimerInterval = null;
+
+    function formatDuration(totalSeconds) {
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        return h + " ساعة و " + m + " دقيقة و " + s + " ثانية";
+    }
+
+    function startShiftTimer() {
+        const timerEl = document.getElementById('shiftTimer');
+        if (!timerEl) return;
+        if (shiftTimerInterval) clearInterval(shiftTimerInterval);
+        shiftTimerInterval = setInterval(() => {
+            shiftTimerSeconds++;
+            timerEl.textContent = formatDuration(shiftTimerSeconds);
+        }, 1000);
+    }
+
+    // Start timer if shift is active
+    {% if active_shift %}
+    startShiftTimer();
+    {% endif %}
+
+    async function startShift() {
+        console.log("Starting shift...");
+        try {
+            const data = await apiPost('/reports/shift/start/');
+            if (data.success) {
+                showToast(data.message);
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.error || 'خطأ غير معروف', 'error');
+            }
+        } catch(e) {
+            console.error("Start shift error:", e);
+            showToast('حدث خطأ في الاتصال بالسيرفر', 'error');
+        }
+    }
+
+    function showEndShiftModal() {
+        console.log("showEndShiftModal called");
+        const modal = document.getElementById('endShiftModal');
+        if (modal) {
+            console.log("Modal element found:", modal);
+            console.log("Current display:", modal.style.display);
+            modal.style.display = 'flex';
+            console.log("Display set to flex. Computed style:", window.getComputedStyle(modal).display);
+        } else {
+            console.error("Modal element NOT found! ID: endShiftModal");
+            showToast('خطأ: لم يتم العثور على نافذة التأكيد', 'error');
+        }
+    }
+
+    function hideEndShiftModal() {
+        const modal = document.getElementById('endShiftModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function endShift() {
+        console.log("Ending shift...");
+        const btn = document.getElementById('confirmEndShiftBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'جاري الإنهاء...';
+        }
+        try {
+            const data = await apiPost('/reports/shift/end/');
+            if (data.success) {
+                showToast(data.message);
+                setTimeout(() => {
+                    window.location.href = '/reports/shift/' + data.shift_id + '/';
+                }, 800);
+            } else {
+                showToast(data.error || 'خطأ غير معروف', 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'تأكيد الإنهاء';
+                }
+            }
+        } catch(e) {
+            console.error("End shift error:", e);
+            showToast('حدث خطأ في الاتصال بالسيرفر', 'error');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'تأكيد الإنهاء';
+            }
+        }
+    }
+
+    // Close modal on overlay click
+    const endShiftModalEl = document.getElementById('endShiftModal');
+    if (endShiftModalEl) {
+        endShiftModalEl.addEventListener('click', function(e) {
+            if (e.target === this) hideEndShiftModal();
+        });
+    }
+
+    // ===== QR Notification =====
+    function updateQRBadge() {
+        apiGet('/api/orders/').then(data => {
+            const badge = document.getElementById('qrBadge');
+            if (badge) {
+                const qrPendingCount = data.orders.filter(o => o.is_from_qr && o.status === 'pending').length;
+                if (qrPendingCount > 0) {
+                    badge.textContent = qrPendingCount;
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }).catch(err => console.error('Error fetching orders for badge:', err));
+    }
+
+    if (document.getElementById('qrBadge')) {
+        updateQRBadge();
+        setInterval(updateQRBadge, 20000);
+    }
+
+
     </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+

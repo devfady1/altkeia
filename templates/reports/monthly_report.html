@@ -2,29 +2,100 @@
 {% block title %}تقرير شهري{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">📆 تقرير شهر {{ month }}/{{ year }}</h1>
+    <div>
+        <h1 class="page-title">📆 تقرير شهر {{ month }}/{{ year }}</h1>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+        {% if month > 1 %}
+        <a href="?month={{ month|add:"-1" }}&year={{ year }}" class="btn btn-ghost btn-sm">→ الشهر السابق</a>
+        {% else %}
+        <a href="?month=12&year={{ year|add:"-1" }}" class="btn btn-ghost btn-sm">→ الشهر السابق</a>
+        {% endif %}
+        {% if month < 12 %}
+        <a href="?month={{ month|add:"1" }}&year={{ year }}" class="btn btn-ghost btn-sm">← الشهر التالي</a>
+        {% else %}
+        <a href="?month=1&year={{ year|add:"1" }}" class="btn btn-ghost btn-sm">← الشهر التالي</a>
+        {% endif %}
+    </div>
 </div>
+
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon green">💰</div>
         <div>
-            <div class="stat-value">{{ total_revenue }} ج.م</div>
+            <div class="stat-value">{{ total_revenue|floatformat:2 }} ج.م</div>
             <div class="stat-label">إجمالي الإيرادات</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon blue">🪑</div>
+        <div class="stat-icon red">🏷️</div>
         <div>
-            <div class="stat-value">{{ sessions_count }}</div>
-            <div class="stat-label">إجمالي الجلسات</div>
+            <div class="stat-value">{{ total_discount|floatformat:2 }} ج.م</div>
+            <div class="stat-label">إجمالي الخصومات</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon orange">💳</div>
+        <div class="stat-icon blue">⏱️</div>
         <div>
-            <div class="stat-value">{{ payments_count }}</div>
-            <div class="stat-label">عمليات الدفع</div>
+            <div class="stat-value">{{ shifts_count }}</div>
+            <div class="stat-label">عدد الشيفتات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">📋</div>
+        <div>
+            <div class="stat-value">{{ total_orders }}</div>
+            <div class="stat-label">عدد الطلبات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">🪑</div>
+        <div>
+            <div class="stat-value">{{ total_sessions }}</div>
+            <div class="stat-label">عدد الجلسات</div>
         </div>
     </div>
 </div>
+
+{% if shifts %}
+<div class="card" style="margin-top:20px;">
+    <h3 class="card-title mb-2">تفاصيل الشيفتات</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الكاشير</th>
+                <th>البداية</th>
+                <th>النهاية</th>
+                <th>المدة</th>
+                <th>الإيرادات</th>
+                <th>الطلبات</th>
+                <th>الجلسات</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in shifts %}
+            <tr>
+                <td>{{ s.pk }}</td>
+                <td>{{ s.started_by.get_full_name|default:s.started_by.username }}</td>
+                <td>{{ s.started_at|date:"d/m h:i A" }}</td>
+                <td>{{ s.ended_at|date:"d/m h:i A" }}</td>
+                <td>{{ s.duration }}</td>
+                <td class="text-success fw-bold">{{ s.total_revenue }} ج.م</td>
+                <td>{{ s.total_orders }}</td>
+                <td>{{ s.total_sessions }}</td>
+                <td>
+                    <a href="{% url 'shift_report' s.pk %}" class="btn btn-ghost btn-sm">📄</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="margin-top:20px; text-align:center; padding:40px;">
+    <p style="color:var(--text-muted); font-size:1.1rem;">لا توجد شيفتات مغلقة في هذا الشهر</p>
+</div>
+{% endif %}
 {% endblock %}

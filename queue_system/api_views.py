@@ -42,11 +42,26 @@ def join_queue_api(request):
     activity_type_id = body.get('activity_type_id')
     customer_name = body.get('customer_name', '')
     requested_hours = body.get('requested_hours', 1)
+    table_uuid = body.get('table_uuid')
 
     activity_type = get_object_or_404(ActivityType, pk=activity_type_id)
+    
+    # Try to link to table/session if uuid provided
+    table = None
+    session = None
+    if table_uuid:
+        from tables.models import Table
+        from cafe_sessions.models import TableSession
+        table = Table.objects.filter(uuid=table_uuid).first()
+        if table:
+            session = TableSession.objects.filter(
+                tables=table, 
+                status__in=['open', 'active']
+            ).first()
+
     last = QueueEntry.objects.filter(
         activity_type=activity_type,
-        status='waiting'
+        status=QueueEntry.Status.WAITING
     ).order_by('-position').first()
     position = (last.position + 1) if last else 1
 
@@ -55,13 +70,15 @@ def join_queue_api(request):
         customer_name=customer_name,
         requested_hours=requested_hours,
         position=position,
+        table=table,
+        session=session
     )
 
     return JsonResponse({
         'success': True,
         'position': entry.position,
         'waiting_before': entry.waiting_count,
-        'message': f'تم تسجيلك في الطابور. ترتيبك: {entry.position}'
+        'message': f'تم تسجيلك في الطابور بنجاح. ترتيبك رقم {entry.position}'
     })
 
 

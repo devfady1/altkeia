@@ -31,7 +31,8 @@
                 <th>المستخدم</th>
                 <th>الاسم</th>
                 <th>الدور</th>
-                <th>الهاتف</th>
+                <th>المرتب</th>
+                <th>يوم القبض</th>
                 <th>الحالة</th>
                 <th>إجراءات</th>
             </tr>
@@ -42,10 +43,12 @@
                 <td class="fw-bold">{{ emp.username }}</td>
                 <td>{{ emp.get_full_name }}</td>
                 <td><span class="badge badge-info">{{ emp.get_role_display }}</span></td>
-                <td>{{ emp.phone|default:"-" }}</td>
+                <td>{{ emp.salary|floatformat:0 }} ج.م</td>
+                <td>{{ emp.payday }}</td>
                 <td><span class="badge {% if emp.is_active_employee %}badge-success{% else %}badge-danger{% endif %}">{{ emp.is_active_employee|yesno:"نشط,معطل" }}</span></td>
                 <td>
                     {% if emp.role != 'owner' %}
+                    <a href="{% url 'employee_detail' emp.pk %}" class="btn btn-info btn-sm" title="تفاصيل">📋</a>
                     <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action"
                             value="toggle"><input type="hidden" name="id" value="{{ emp.pk }}"><button
                             class="btn btn-ghost btn-sm">🔄</button></form>

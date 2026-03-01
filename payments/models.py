@@ -30,6 +30,17 @@ class Payment(models.Model):
     )
     paid_at = models.DateTimeField(auto_now_add=True, verbose_name='وقت الدفع')
     discount = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name='الخصم')
+    shift = models.ForeignKey(
+        'reports.CashierShift',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='payments',
+        verbose_name='الشيفت'
+    )
+    shift_invoice_number = models.PositiveIntegerField(
+        default=0,
+        verbose_name='رقم الفاتورة في الشيفت'
+    )
     notes = models.TextField(blank=True, verbose_name='ملاحظات')
 
     class Meta:
