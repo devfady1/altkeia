@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}تقرير شيفت #{{ shift.pk }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">⏱️ تقرير شيفت #{{ shift.pk }}</h1>
+        <p class="page-subtitle">
+            {{ shift.started_at|date:"j F Y" }} — 
+            {{ shift.started_at|date:"h:i A" }} 
+            {% if shift.ended_at %}→ {{ shift.ended_at|date:"h:i A" }}{% else %}(مستمر){% endif %}
+        </p>
+    </div>
+    <a href="{% url 'reports' %}" class="btn btn-ghost btn-sm">← رجوع للتقارير</a>
+</div>
+
+<div class="shift-meta" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+    <div class="stat-card" style="flex:1; min-width:200px;">
+        <div class="stat-icon" style="background:{% if shift.is_active %}var(--success){% else %}var(--text-muted){% endif %}; color:#fff;">
+            {% if shift.is_active %}🟢{% else %}🔴{% endif %}
+        </div>
+        <div>
+            <div class="stat-value">{% if shift.is_active %}نشط{% else %}مغلق{% endif %}</div>
+            <div class="stat-label">الحالة</div>
+        </div>
+    </div>
+    <div class="stat-card" style="flex:1; min-width:200px;">
+        <div class="stat-icon blue">👤</div>
+        <div>
+            <div class="stat-value">{{ shift.started_by.get_full_name|default:shift.started_by.username }}</div>
+            <div class="stat-label">بدأ بواسطة</div>
+        </div>
+    </div>
+    <div class="stat-card" style="flex:1; min-width:200px;">
+        <div class="stat-icon purple">⏱️</div>
+        <div>
+            <div class="stat-value">{{ shift.duration }}</div>
+            <div class="stat-label">المدة</div>
+        </div>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">💰</div>
+        <div>
+            <div class="stat-value">{{ total_revenue }} ج.م</div>
+            <div class="stat-label">الإيرادات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red">🏷️</div>
+        <div>
+            <div class="stat-value">{{ total_discount }} ج.م</div>
+            <div class="stat-label">الخصومات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">🪑</div>
+        <div>
+            <div class="stat-value">{{ sessions_count }}</div>
+            <div class="stat-label">الجلسات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">📋</div>
+        <div>
+            <div class="stat-value">{{ orders_count }}</div>
+            <div class="stat-label">الطلبات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">🎮</div>
+        <div>
+            <div class="stat-value">{{ activities_revenue }} ج.م</div>
+            <div class="stat-label">إيرادات الأنشطة</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">🎯</div>
+        <div>
+            <div class="stat-value">{{ activities_count }}</div>
+            <div class="stat-label">جلسات نشاط</div>
+        </div>
+    </div>
+</div>
+
+{% if sessions %}
+<div class="card" style="margin-top:20px;">
+    <h3 class="card-title mb-2">الجلسات المغلقة</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الطاولة</th>
+                <th>الوقت</th>
+                <th>الإجمالي</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td>{{ s.pk }}</td>
+                <td>{{ s.primary_table.display_name }}</td>
+                <td>{{ s.opened_at|date:"h:i A" }} - {{ s.closed_at|date:"h:i A" }}</td>
+                <td class="text-success fw-bold">{{ s.total_amount }} ج.م</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if staff_orders or staff_advances %}
+<div class="card" style="margin-top:20px;">
+    <h3 class="card-title mb-2">👤 خصومات الموظفين</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 20px;flex:1;min-width:150px;text-align:center;">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--primary);">{{ staff_orders_total }} ج.م</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);">طلبات موظفين</div>
+        </div>
+        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 20px;flex:1;min-width:150px;text-align:center;">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--warning);">{{ staff_advances_total }} ج.م</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);">سلف</div>
+        </div>
+        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 20px;flex:1;min-width:150px;text-align:center;">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--danger);">{{ staff_deductions_total }} ج.م</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);">إجمالي الخصومات</div>
+        </div>
+    </div>
+
+    {% if staff_orders %}
+    <h4 style="margin-bottom:6px;">🍔 طلبات الموظفين</h4>
+    <table class="data-table" style="margin-bottom:12px;">
+        <thead><tr><th>الموظف</th><th>الوصف</th><th>المبلغ</th><th>الوقت</th></tr></thead>
+        <tbody>
+            {% for o in staff_orders %}
+            <tr>
+                <td>{{ o.employee.get_full_name|default:o.employee.username }}</td>
+                <td>{{ o.description }}</td>
+                <td class="fw-bold">{{ o.amount }} ج.م</td>
+                <td>{{ o.created_at|date:"h:i A" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if staff_advances %}
+    <h4 style="margin-bottom:6px;">💸 السلف</h4>
+    <table class="data-table">
+        <thead><tr><th>الموظف</th><th>المبلغ</th><th>السبب</th><th>الوقت</th></tr></thead>
+        <tbody>
+            {% for a in staff_advances %}
+            <tr>
+                <td>{{ a.employee.get_full_name|default:a.employee.username }}</td>
+                <td class="fw-bold">{{ a.amount }} ج.م</td>
+                <td>{{ a.reason|default:"-" }}</td>
+                <td>{{ a.created_at|date:"h:i A" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

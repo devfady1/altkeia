@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load order_tags %}
+
+{% block title %}مراجعة الفواتير - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <div class="d-flex justify-between align-center mb-3">
+        <div>
+            <h1 class="h2 mb-1">🧾 مراجعة الفواتير</h1>
+            <p class="text-muted">عرض وتدقيق عمليات الدفع حسب الشيفت</p>
+        </div>
+        
+        <form method="get" class="d-flex gap-1">
+            <select name="shift_id" class="form-control" style="width: 250px;" onchange="this.form.submit()">
+                {% for s in recent_shifts %}
+                    <option value="{{ s.id }}" {% if selected_shift.id == s.id %}selected{% endif %}>
+                        شيفت #{{ s.id }} - {{ s.started_at|date:"Y-m-d h:i A" }}
+                        {% if s.is_active %}(نشط حالياً){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-primary">عرض</button></noscript>
+        </form>
+    </div>
+
+    {% if selected_shift %}
+    <div class="grid grid-cols-4 mb-3" style="gap: 15px;">
+        <div class="card p-2 text-center">
+            <div class="text-muted small">إجمالي الإيراد</div>
+            <div class="h3 fw-bold text-success">{{ selected_shift.total_revenue|floatformat:2 }} ج.م</div>
+        </div>
+        <div class="card p-2 text-center">
+            <div class="text-muted small">عدد الفواتير</div>
+            <div class="h3 fw-bold">{{ payments.count }}</div>
+        </div>
+        <div class="card p-2 text-center">
+            <div class="text-muted small">إجمالي الخصم</div>
+            <div class="h3 fw-bold text-danger">{{ selected_shift.total_discount|floatformat:2 }} ج.m</div>
+        </div>
+        <div class="card p-2 text-center">
+            <div class="text-muted small">حالة الشيفت</div>
+            <div class="h3 fw-bold">
+                {% if selected_shift.is_active %}
+                <span class="badge badge-success">نشط</span>
+                {% else %}
+                <span class="badge badge-secondary">مغلق</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>رقم الفاتورة</th>
+                    <th>الطاولة</th>
+                    <th>الوقت</th>
+                    <th>الكاشير</th>
+                    <th>المبلغ</th>
+                    <th>الخصم</th>
+                    <th>الصافي</th>
+                    <th>الطريقة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td><span class="fw-bold">#{{ p.shift_invoice_number|default:p.id }}</span></td>
+                    <td>{{ p.session.primary_table.display_name }}</td>
+                    <td>{{ p.paid_at|date:"h:i A" }}</td>
+                    <td>{{ p.paid_by.username }}</td>
+                    <td>{{ p.amount|floatformat:2 }}</td>
+                    <td class="text-danger">-{{ p.discount|floatformat:2 }}</td>
+                    <td class="fw-bold text-success">{{ p.final_amount|floatformat:2 }}</td>
+                    <td>
+                        {% if p.method == 'cash' %}
+                        <span class="badge badge-success">كاش</span>
+                        {% else %}
+                        <span class="badge badge-primary">بطاقة</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-ghost" onclick="window.printReceipt({{ p.id }})">🖨️</button>
+                        {% if p.session.orders.exists %}
+                            <button class="btn btn-sm btn-primary" 
+                                    data-session-id="{{ p.session.id }}"
+                                    data-items="{{ p.session|session_items_json|escape }}"
+                                    onclick="openEditModal(this)">📝 تعديل</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">لا توجد عمليات دفع في هذا الشيفت</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card p-5 text-center text-muted">
+        <h3>لا توجد بيانات متاحة</h3>
+        <p>يرجى اختيار شيفت من القائمة بالأعلى</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+window.printReceipt = function(paymentId) {
+    showToast('جاري إرسال أمر الطباعة...', 'success');
+    apiPost(`/api/payments/${paymentId}/reprint/`).then(res => {
+        if(res.success) showToast('تمت الطباعة');
+        else showToast(res.error || 'خطأ في الطباعة', 'error');
+    });
+}
+
+let currentEditSessionId = null;
+let currentEditItems = [];
+
+function openEditModal(btn) {
+    const sessionId = btn.dataset.sessionId;
+    let itemsData = [];
+    try {
+        itemsData = JSON.parse(btn.dataset.items);
+    } catch(e) {
+        console.error("Error parsing items", e);
+        showToast("خطأ في قراءة بيانات الجلسة", "error");
+        return;
+    }
+    editSessionItems(sessionId, itemsData);
+}
+
+function editSessionItems(sessionId, itemsData) {
+    currentEditSessionId = sessionId;
+    currentEditItems = itemsData || [];
+    
+    document.getElementById('editSessionIdText').textContent = sessionId;
+    const list = document.getElementById('editItemsList');
+    list.innerHTML = '';
+    
+    currentEditItems.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.style = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px;';
+        div.innerHTML = `
+            <div style="flex:1;"><div style="font-weight:700;">${item.name}</div></div>
+            <div class="d-flex align-center" style="gap:10px;">
+                <button class="btn btn-sm btn-ghost" style="padding:2px 10px;" onclick="updateEditQty(${index}, -1)">-</button>
+                <strong id="eqty-${index}">${item.qty}</strong>
+                <button class="btn btn-sm btn-ghost" style="padding:2px 10px;" onclick="updateEditQty(${index}, 1)">+</button>
+                <button class="btn btn-sm btn-danger" style="margin-right:10px;" onclick="removeEditItem(${index})">✕</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+    
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+function updateEditQty(index, delta) {
+    currentEditItems[index].qty = Math.max(0, currentEditItems[index].qty + delta);
+    const el = document.getElementById(`eqty-${index}`);
+    if(el) el.textContent = currentEditItems[index].qty;
+}
+
+function removeEditItem(index) {
+    currentEditItems.splice(index, 1);
+    editSessionItems(currentEditSessionId, currentEditItems);
+}
+
+async function saveOrderEdits() {
+    const payload = { items: currentEditItems.map(i => ({ item_id: i.id, quantity: i.qty })) };
+    const result = await apiPost(`/api/sessions/${currentEditSessionId}/edit-items/`, payload);
+    if (result.success) {
+        showToast(result.message || 'تم التعديل');
+        document.getElementById('editModal').style.display = 'none';
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast(result.error || 'خطأ', 'error');
+    }
+}
+</script>
+
+<div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="width:100%; max-width:500px; padding:25px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:20px;">
+        <h3 style="margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">📝 تعديل الفاتورة للطلب #<span id="editSessionIdText"></span></h3>
+        <div id="editItemsList" style="max-height:350px; overflow-y:auto; margin-bottom:20px;"></div>
+        <div class="d-flex justify-between" style="gap:10px;">
+            <button class="btn btn-ghost" onclick="document.getElementById('editModal').style.display='none'">إلغاء</button>
+            <button class="btn btn-primary" onclick="saveOrderEdits()">حفظ التغييرات ✨</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
