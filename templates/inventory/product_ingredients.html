@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}ربط المنتجات بالمواد الخام{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <a href="{% url 'inventory_dashboard' %}" style="color:var(--text-muted);text-decoration:none;font-size:1.2rem;">←</a>
+        <h1 class="page-title" style="margin:0;">🔗 ربط المنتجات بالمواد الخام</h1>
+    </div>
+    <button onclick="document.getElementById('addIngredientModal').style.display='flex'" style="padding:8px 16px;border-radius:10px;background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;font-family:var(--font);font-size:0.85rem;border:none;cursor:pointer;">➕ ربط منتج بمادة</button>
+</div>
+
+<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px;">
+    هنا تربط كل منتج في المنيو بالمواد الخام اللي بيحتاجها. مثلاً: لاتيه يحتاج 200ml حليب + 18g قهوة.
+    <br>لما تيجي أوردر لاتيه، هيتخصم تلقائي من المخزون.
+</p>
+
+<!-- Products List with Ingredients -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+    {% for entry in products_with_ingredients %}
+    <div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);overflow:hidden;">
+        <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div>
+                <span style="font-weight:700;">{{ entry.product.name }}</span>
+                <span style="color:var(--text-muted);font-size:0.8rem;margin-inline-start:8px;">{{ entry.category.name }}</span>
+            </div>
+            <span style="font-size:0.75rem;color:var(--text-muted);background:var(--bg-secondary);padding:3px 10px;border-radius:8px;">
+                {{ entry.ingredients.count }} مكون
+            </span>
+        </div>
+        {% if entry.ingredients %}
+        <div style="border-top:1px solid var(--border-color);padding:12px 18px;">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                {% for ing in entry.ingredients %}
+                <div style="display:flex;align-items:center;gap:6px;background:var(--bg-secondary);padding:6px 12px;border-radius:10px;border:1px solid var(--border-color);font-size:0.8rem;">
+                    <span>{{ ing.inventory_item.name }}</span>
+                    <span style="color:var(--primary);font-weight:600;">{{ ing.quantity_used|floatformat:1 }}</span>
+                    <span style="color:var(--text-muted);">{% if ing.usage_unit %}{{ ing.get_usage_unit_display }}{% else %}{{ ing.inventory_item.get_unit_display }}{% endif %}</span>
+                    {% if ing.usage_unit and ing.usage_unit != ing.inventory_item.unit %}
+                    <span style="color:var(--text-muted);font-size:0.7rem;">→ {{ ing.quantity_in_stock_unit|floatformat:3 }} {{ ing.inventory_item.get_unit_display }}</span>
+                    {% endif %}
+                    <form method="post" style="margin:0;display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_ingredient">
+                        <input type="hidden" name="id" value="{{ ing.pk }}">
+                        <button type="submit" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:0.7rem;padding:0 4px;" title="حذف">✕</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div style="padding:40px;text-align:center;color:var(--text-muted);background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);">
+        <div style="font-size:2rem;margin-bottom:8px;">🔗</div>
+        <div>لا توجد منتجات نشطة. تأكد من إضافة المنتجات والمواد الخام أولاً.</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Ingredient Modal -->
+<div id="addIngredientModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-card);border-radius:20px;padding:28px;width:100%;max-width:480px;border:1px solid var(--border-color);box-shadow:0 25px 50px rgba(0,0,0,0.4);">
+        <h3 style="margin:0 0 20px 0;">➕ ربط منتج بمادة خام</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_ingredient">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">المنتج *</label>
+                    <select name="product_id" required id="ingredientProductSelect" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                        <option value="">اختر المنتج...</option>
+                        {% for cat in categories %}
+                        <optgroup label="{{ cat.name }}">
+                            {% for p in cat.products.all %}
+                            <option value="{{ p.pk }}">{{ p.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">المادة الخام *</label>
+                    <select name="inventory_item_id" required style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                        <option value="">اختر المادة الخام...</option>
+                        {% for inv in inventory_items %}
+                        <option value="{{ inv.pk }}">{{ inv.name }} ({{ inv.get_unit_display }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الكمية المستخدمة لكل وحدة من المنتج *</label>
+                        <input type="number" name="quantity_used" step="0.001" required min="0.001" placeholder="مثلاً: 200" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">وحدة الخصم</label>
+                        <select name="usage_unit" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                            <option value="">نفس وحدة المادة الخام</option>
+                            <option value="ml">ملليلتر (ml)</option>
+                            <option value="g">جرام (g)</option>
+                            <option value="piece">قطعة</option>
+                            <option value="bottle">زجاجة</option>
+                            <option value="kg">كيلو (kg)</option>
+                            <option value="liter">لتر</option>
+                            <option value="pack">عبوة</option>
+                            <option value="plate">طبق</option>
+                            <option value="loaf">رغيف</option>
+                        </select>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">مثلاً: المادة بالـ"لتر" والخصم بالـ"مل" - التحويل تلقائي</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" onclick="document.getElementById('addIngredientModal').style.display='none'" style="padding:8px 20px;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer;font-family:var(--font);">إلغاء</button>
+                <button type="submit" style="padding:8px 20px;border-radius:10px;background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none;cursor:pointer;font-family:var(--font);font-weight:600;">ربط</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const modal = document.getElementById('addIngredientModal');
+if (modal) modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+</script>
+{% endblock %}

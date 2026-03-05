@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}المخزون{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <h1 class="page-title">📦 إدارة المخزون</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{% url 'product_ingredients' %}" class="btn btn-primary" style="padding:8px 16px;border-radius:10px;background:linear-gradient(135deg,#8e44ad,#9b59b6);color:#fff;text-decoration:none;font-family:var(--font);font-size:0.85rem;border:none;cursor:pointer;">🔗 ربط المنتجات بالمواد</a>
+        <a href="{% url 'shift_inventory_report' %}" class="btn btn-primary" style="padding:8px 16px;border-radius:10px;background:linear-gradient(135deg,#2980b9,#3498db);color:#fff;text-decoration:none;font-family:var(--font);font-size:0.85rem;border:none;cursor:pointer;">📊 تقرير الشيفت</a>
+        <button onclick="document.getElementById('addItemModal').style.display='flex'" class="btn" style="padding:8px 16px;border-radius:10px;background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;font-family:var(--font);font-size:0.85rem;border:none;cursor:pointer;">➕ إضافة مادة خام</button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">إجمالي المواد</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--text-primary);">{{ total_items }}</div>
+    </div>
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">⚠️ مخزون منخفض</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#f39c12;">{{ low_stock_count }}</div>
+    </div>
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">🚫 نفد من المخزون</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#e74c3c;">{{ out_of_stock_count }}</div>
+    </div>
+</div>
+
+<!-- Inventory Items Table -->
+<div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);overflow:hidden;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);font-weight:700;">
+        📋 قائمة المواد الخام
+    </div>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--bg-secondary);font-size:0.8rem;color:var(--text-muted);">
+                    <th style="padding:12px 16px;text-align:right;">المادة</th>
+                    <th style="padding:12px 16px;text-align:center;">الوحدة</th>
+                    <th style="padding:12px 16px;text-align:center;">الكمية الحالية</th>
+                    <th style="padding:12px 16px;text-align:center;">الحد الأدنى</th>
+                    <th style="padding:12px 16px;text-align:center;">الحالة</th>
+                    <th style="padding:12px 16px;text-align:center;">إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr style="border-bottom:1px solid var(--border-color);transition:background 0.2s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding:12px 16px;">
+                        <a href="{% url 'inventory_item_detail' item.pk %}" style="color:var(--text-primary);text-decoration:none;font-weight:600;">
+                            {{ item.name }}
+                        </a>
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;font-size:0.85rem;color:var(--text-muted);">
+                        {{ item.get_unit_display }}
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;font-weight:600;">
+                        {{ item.current_stock|floatformat:1 }}
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+                        {{ item.minimum_stock|floatformat:1 }}
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;">
+                        {% if item.stock_status == 'ok' %}
+                            <span style="background:rgba(46,204,113,0.15);color:#2ecc71;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;">متوفر ✅</span>
+                        {% elif item.stock_status == 'low' %}
+                            <span style="background:rgba(243,156,18,0.15);color:#f39c12;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;">منخفض ⚠️</span>
+                        {% else %}
+                            <span style="background:rgba(231,76,60,0.15);color:#e74c3c;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;">نفد 🚫</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;">
+                        <div style="display:flex;gap:6px;justify-content:center;">
+                            <button onclick="openStockModal({{ item.pk }}, '{{ item.name }}', 'add')" style="padding:4px 10px;border-radius:8px;background:rgba(46,204,113,0.15);color:#2ecc71;border:none;cursor:pointer;font-size:0.75rem;font-family:var(--font);" title="إضافة وارد">📥 وارد</button>
+                            <button onclick="openStockModal({{ item.pk }}, '{{ item.name }}', 'waste')" style="padding:4px 10px;border-radius:8px;background:rgba(231,76,60,0.15);color:#e74c3c;border:none;cursor:pointer;font-size:0.75rem;font-family:var(--font);" title="تسجيل هالك">🗑️ هالك</button>
+                            <a href="{% url 'inventory_item_detail' item.pk %}" style="padding:4px 10px;border-radius:8px;background:rgba(52,152,219,0.15);color:#3498db;text-decoration:none;font-size:0.75rem;font-family:var(--font);" title="تفاصيل">📋</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="padding:40px;text-align:center;color:var(--text-muted);">
+                        <div style="font-size:2rem;margin-bottom:8px;">📦</div>
+                        <div>لا توجد مواد خام بعد. أضف أول مادة!</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div id="addItemModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-card);border-radius:20px;padding:28px;width:100%;max-width:480px;border:1px solid var(--border-color);box-shadow:0 25px 50px rgba(0,0,0,0.4);">
+        <h3 style="margin:0 0 20px 0;font-size:1.1rem;">➕ إضافة مادة خام جديدة</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_item">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">اسم المادة *</label>
+                    <input type="text" name="name" required placeholder="مثلاً: حليب، قهوة إسبرسو..." style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">وحدة القياس *</label>
+                        <select name="unit" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                            {% for value, label in unit_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الكمية الحالية</label>
+                        <input type="number" name="current_stock" step="0.001" value="0" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الحد الأدنى</label>
+                        <input type="number" name="minimum_stock" step="0.001" value="0" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">تكلفة الوحدة (جنيه)</label>
+                        <input type="number" name="cost_per_unit" step="0.01" value="0" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" onclick="document.getElementById('addItemModal').style.display='none'" style="padding:8px 20px;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer;font-family:var(--font);">إلغاء</button>
+                <button type="submit" style="padding:8px 20px;border-radius:10px;background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none;cursor:pointer;font-family:var(--font);font-weight:600;">حفظ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Stock Action Modal (Add Stock / Waste) -->
+<div id="stockActionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-card);border-radius:20px;padding:28px;width:100%;max-width:400px;border:1px solid var(--border-color);box-shadow:0 25px 50px rgba(0,0,0,0.4);">
+        <h3 id="stockModalTitle" style="margin:0 0 20px 0;font-size:1.1rem;"></h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="stockModalAction" value="">
+            <input type="hidden" name="item_id" id="stockModalItemId" value="">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الكمية *</label>
+                    <input type="number" name="quantity" step="0.001" required min="0.001" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">ملاحظات</label>
+                    <input type="text" name="notes" placeholder="اختياري..." style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" onclick="document.getElementById('stockActionModal').style.display='none'" style="padding:8px 20px;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer;font-family:var(--font);">إلغاء</button>
+                <button type="submit" id="stockModalSubmitBtn" style="padding:8px 20px;border-radius:10px;color:#fff;border:none;cursor:pointer;font-family:var(--font);font-weight:600;">تأكيد</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openStockModal(itemId, itemName, type) {
+    document.getElementById('stockModalItemId').value = itemId;
+    const btn = document.getElementById('stockModalSubmitBtn');
+    if (type === 'add') {
+        document.getElementById('stockModalTitle').textContent = '📥 إضافة وارد - ' + itemName;
+        document.getElementById('stockModalAction').value = 'add_stock';
+        btn.style.background = 'linear-gradient(135deg,#27ae60,#2ecc71)';
+    } else {
+        document.getElementById('stockModalTitle').textContent = '🗑️ تسجيل هالك - ' + itemName;
+        document.getElementById('stockModalAction').value = 'waste';
+        btn.style.background = 'linear-gradient(135deg,#e74c3c,#c0392b)';
+    }
+    document.getElementById('stockActionModal').style.display = 'flex';
+}
+
+// Close modals on overlay click
+['addItemModal', 'stockActionModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; });
+});
+</script>
+{% endblock %}

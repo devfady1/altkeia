@@ -14,20 +14,36 @@ def start_activity_api(request):
     body = json.loads(request.body)
     device_id = body.get('device_id')
     session_id = body.get('session_id')
+    
     device = get_object_or_404(Device, pk=device_id)
     session = get_object_or_404(TableSession, pk=session_id)
+    
+    from queue_system.models import QueueEntry
+    
+    # Calculate position for the new queue entry
+    last = QueueEntry.objects.filter(
+        activity_type=device.activity_type,
+        status=QueueEntry.Status.WAITING
+    ).order_by('-position').first()
+    position = (last.position + 1) if last else 1
+    
+    # Create QueueEntry instead of ActivitySession
+    queue_entry = QueueEntry.objects.create(
+        customer_name=session.primary_table.display_name,
+        activity_type=device.activity_type,
+        requested_hours=1,
+        position=position,
+        table=session.primary_table,
+        device=device,  # Store the specific device clicked
+        session=session,
+        status=QueueEntry.Status.WAITING
+    )
+    
+    # Optionally update table status to PENDING or stay as is
+    # session.primary_table.status = Table.Status.PENDING
+    # session.primary_table.save()
 
-    if device.status != Device.Status.AVAILABLE:
-        return JsonResponse({'error': 'الجهاز غير متاح'}, status=400)
-
-    device.status = Device.Status.BUSY
-    device.save()
-
-    act = ActivitySession.objects.create(device=device, session=session)
-    session.primary_table.status = Table.Status.ACTIVITY
-    session.primary_table.save()
-
-    return JsonResponse({'success': True, 'activity_id': act.pk})
+    return JsonResponse({'success': True, 'queued': True, 'queue_id': queue_entry.pk})
 
 
 @login_required

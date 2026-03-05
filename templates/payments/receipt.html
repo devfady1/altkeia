@@ -151,7 +151,7 @@
         <div class="row"><span>رقم الفاتورة:</span> <span>#{{ payment.pk }}</span></div>
         <div class="row"><span>التاريخ:</span> <span>{{ payment.paid_at|date:"Y/m/d" }}</span></div>
         <div class="row"><span>الوقت:</span> <span>{{ payment.paid_at|time:"H:i" }}</span></div>
-        <div class="row"><span>الطاولة:</span> <span>{{ session.primary_table.display_name }}</span></div>
+        <div class="row"><span>الطاولة:</span> <span>{{ session.primary_table.display_name|default:"بدون طاولة" }}</span></div>
         <div class="row"><span>الكاشير:</span> <span>{{ payment.paid_by.first_name|default:payment.paid_by.username }}</span></div>
         <div class="row"><span>طريقة الدفع:</span> <span>{{ payment.get_method_display }}</span></div>
         {% if session.tables.count > 1 %}

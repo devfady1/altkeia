@@ -10,11 +10,19 @@ class Payment(models.Model):
         CASH = 'cash', 'كاش'
         CARD = 'card', 'بطاقة'
 
-    session = models.OneToOneField(
+    session = models.ForeignKey(
         TableSession, on_delete=models.CASCADE,
-        related_name='payment', verbose_name='الجلسة'
+        related_name='payments', verbose_name='الجلسة',
+        null=True, blank=True
+    )
+    activity_session = models.ForeignKey(
+        'activities.ActivitySession', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='payments',
+        verbose_name='جلسة النشاط'
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='المبلغ')
+    refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='المبلغ المرتجع')
     method = models.CharField(
         max_length=20,
         choices=Method.choices,

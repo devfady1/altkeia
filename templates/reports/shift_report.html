@@ -37,6 +37,13 @@
             <div class="stat-label">المدة</div>
         </div>
     </div>
+    <div class="stat-card" style="flex:1; min-width:200px;">
+        <div class="stat-icon" style="background:var(--primary); color:#fff;">✨</div>
+        <div>
+            <div class="stat-value">{{ shift.get_shift_type_display }}</div>
+            <div class="stat-label">نوع الشيفت</div>
+        </div>
+    </div>
 </div>
 
 <div class="stats-grid">
@@ -100,7 +107,7 @@
             {% for s in sessions %}
             <tr>
                 <td>{{ s.pk }}</td>
-                <td>{{ s.primary_table.display_name }}</td>
+                <td>{{ s.primary_table.display_name|default:"بدون طاولة" }}</td>
                 <td>{{ s.opened_at|date:"h:i A" }} - {{ s.closed_at|date:"h:i A" }}</td>
                 <td class="text-success fw-bold">{{ s.total_amount }} ج.م</td>
             </tr>
@@ -110,7 +117,40 @@
 </div>
 {% endif %}
 
-{% if staff_orders or staff_advances %}
+{% if unassigned_payments %}
+<div class="card" style="margin-top:20px; border-left: 4px solid var(--warning);">
+    <h3 class="card-title mb-2 text-warning">⚠️ فواتير خارج الشيفت</h3>
+    <p class="text-sm text-muted mb-3">هذه المطالبات تم دفعها بعد إغلاق الشيفت السابق وقبل فتح هذا الشيفت، وتم إضافتها لإجمالي إيرادات هذا الشيفت التراكمية.</p>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>رقم الفاتورة</th>
+                <th>الطاولة / نوع الطلب</th>
+                <th>بواسطة</th>
+                <th>الوقت</th>
+                <th>المبلغ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in unassigned_payments %}
+            <tr>
+                <td>#{{ p.pk }}</td>
+                <td>
+                    {% if p.session %}
+                        {{ p.session.primary_table.display_name|default:"بدون طاولة" }}
+                    {% else %}
+                        تيك أواي 🛍️
+                    {% endif %}
+                </td>
+                <td>{{ p.paid_by.get_full_name|default:p.paid_by.username }}</td>
+                <td>{{ p.paid_at|date:"h:i A" }}</td>
+                <td class="text-success fw-bold">{{ p.amount }} ج.م</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}{% if staff_orders or staff_advances %}
 <div class="card" style="margin-top:20px;">
     <h3 class="card-title mb-2">👤 خصومات الموظفين</h3>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">

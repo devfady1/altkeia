@@ -1,31 +1,252 @@
 {% extends 'base.html' %}
 {% block title %}الطابور{% endblock %}
+
+{% block extra_css %}
+<style>
+    .queue-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 992px) {
+        .queue-grid { grid-template-columns: 1fr; }
+    }
+    .active-session-card {
+        border-right: 4px solid var(--success);
+    }
+    .timer-badge {
+        font-family: monospace;
+        font-size: 1.1rem;
+        background: rgba(46, 204, 113, 0.1);
+        color: var(--success);
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+    .price-badge {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: var(--warning);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">⏳ الطابور</h1>
-</div>
-{% for activity_type, entries in queues.items %}
-<div class="card mb-2">
-    <div class="card-header">
-        <h3 class="card-title">{{ activity_type.icon }} {{ activity_type.name }}</h3>
-        <span class="badge {% if entries %}badge-warning{% else %}badge-success{% endif %}">{{ entries|length }}
-            منتظر</span>
+    <h1 class="page-title">⏳ نظام الطابور الموحد</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('addQueueModal').classList.add('active')">➕ إضافة للطابور</button>
     </div>
-    {% for entry in entries %}
-    <div class="order-item">
-        <div class="order-item-qty">{{ entry.position }}</div>
-        <div class="order-item-info">
-            <div class="order-item-name">{{ entry.customer_name|default:"عميل" }}</div>
-            <div class="order-item-notes">{{ entry.requested_hours }} ساعة</div>
-        </div>
-        <div>
-            <form method="post" action="{% url 'activate_queue' entry.pk %}" style="display:inline;">{% csrf_token %}<button class="btn btn-success btn-sm">▶ تشغيل</button></form>
-            <form method="post" action="{% url 'cancel_queue' entry.pk %}" style="display:inline;">{% csrf_token %}<button class="btn btn-danger btn-sm">✕</button></form>
-        </div>
-    </div>
-    {% empty %}
-    <p class="text-muted text-center" style="padding:16px;">لا يوجد منتظرون</p>
-    {% endfor %}
 </div>
-{% endfor %}
+
+<div class="queue-grid">
+    <!-- Waiting Section -->
+    <div class="waiting-section">
+        <h2 class="mb-3">⏸️ في الانتظار</h2>
+        {% for activity_type, entries in waiting_queues.items %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">{{ activity_type.icon }} {{ activity_type.name }}</h3>
+                <span class="badge {% if entries %}badge-warning{% else %}badge-success{% endif %}">{{ entries|length }} منتظر</span>
+            </div>
+            <div class="card-body p-0">
+                {% for entry in entries %}
+                <div class="order-item">
+                    <div class="order-item-qty">{{ entry.position }}</div>
+                    <div class="order-item-info">
+                        <div class="order-item-name">{{ entry.customer_name|default:"عميل" }}</div>
+                        <div class="order-item-notes">
+                            {{ entry.activity_type.name }} • {% if entry.table %}{{ entry.table.display_name }}{% else %}بدون طاولة{% endif %}
+                        </div>
+                    </div>
+                    <div class="order-item-actions">
+                        <form method="post" action="{% url 'activate_queue' entry.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button class="btn btn-success btn-sm">▶ تشغيل</button>
+                        </form>
+                        <form method="post" action="{% url 'cancel_queue' entry.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm">✕</button>
+                        </form>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center p-3">لا يوجد منتظرون لهذا النشاط</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Active Section -->
+    <div class="active-section">
+        <h2 class="mb-3">🚀 الجلسات النشطة</h2>
+        {% for session in active_sessions %}
+        <div class="card mb-3 active-session-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h3 class="mb-1">
+                            {% if session.queue_entry %}
+                                {{ session.queue_entry.customer_name|default:"عميل" }}
+                            {% else %}
+                                {{ session.session.primary_table.display_name|default:"بدون طاولة" }} (نشاط مباشر)
+                            {% endif %}
+                        </h3>
+                        <div class="text-muted">
+                            {{ session.device.activity_type.icon }} {{ session.device.name }} 
+                            {% if session.session.primary_table %} - {{ session.session.primary_table.display_name }}{% endif %}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="timer-badge mb-1" id="timer-{{ session.pk }}" data-start="{{ session.started_at|date:'c' }}">00:00:00</div>
+                        <div class="price-badge" id="price-{{ session.pk }}" data-rate="{{ session.device.activity_type.price_per_hour }}">0.00 ج.م</div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <form method="post" action="{% url 'finish_queue_entry' session.pk %}?print=true" style="flex:1;">
+                        {% csrf_token %}
+                        <button class="btn btn-warning w-100" onclick="return confirm('تأكيد إنهاء النشاط وطباعة الفاتورة؟')">🏁 إنهاء وطباعة</button>
+                    </form>
+                    <form method="post" action="{% url 'finish_queue_entry' session.pk %}?print=false" style="flex:1;">
+                        {% csrf_token %}
+                        <button class="btn btn-primary w-100" onclick="return confirm('تأكيد إنهاء النشاط بدون طباعة؟')">🏁 إنهاء فقط</button>
+                    </form>
+                    {% if session.queue_entry %}
+                    <form method="post" action="{% url 'cancel_queue' session.queue_entry.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm" onclick="return confirm('تأكيد الإلغاء؟ لن يتم احتساب أي مبلغ.')">إلغاء</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card p-5 text-center text-muted">
+            <h3>لا توجد جلسات نشطة حالياً</h3>
+            <p>قم بتشغيل العملاء من قائمة الانتظار للبدء</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Queue Modal -->
+<div class="modal-overlay" id="addQueueModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>إضافة عميل جديد للطابور</h3>
+        </div>
+        <form method="post" action="{% url 'join_queue' %}">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group mb-3">
+                    <label>اسم العميل</label>
+                    <input type="text" name="customer_name" class="form-control" required placeholder="أدخل اسم العميل">
+                </div>
+                <div class="form-group mb-3">
+                    <label>نوع النشاط</label>
+                    <select name="activity_type_id" class="form-control" required>
+                        {% for at in activity_types %}
+                        <option value="{{ at.pk }}">{{ at.icon }} {{ at.name }} ({{ at.price_per_hour }} ج.م/ساعة)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label>الطاولة (اختياري)</label>
+                    <select name="table_id" class="form-control">
+                        <option value="">بدون طاولة</option>
+                        {% for t in tables %}
+                        <option value="{{ t.pk }}">{{ t.display_name }} ({{ t.floor.name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label>الجهاز (اختياري)</label>
+                    <select name="device_id" id="device_select" class="form-control">
+                        <option value="">أي جهاز متاح</option>
+                        {% for at in activity_types %}
+                            {% for device in at.devices.all %}
+                            <option value="{{ device.pk }}" data-type="{{ at.pk }}">{{ device.name }}</option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>رقم الساعات المقترح</label>
+                    <input type="number" name="requested_hours" class="form-control" value="1" step="0.5">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addQueueModal').classList.remove('active')">إلغاء</button>
+                <button type="submit" class="btn btn-primary">إضافة للطابور</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateTimers() {
+        const timers = document.querySelectorAll('[id^="timer-"]');
+        const now = new Date();
+
+        timers.forEach(timer => {
+            const startStr = timer.dataset.start;
+            const start = new Date(startStr);
+            const diffMs = now - start;
+            if (diffMs < 0) {
+                 timer.textContent = "00:00:00";
+                 return;
+            }
+
+            const diffSec = Math.floor(diffMs / 1000);
+            const h = Math.floor(diffSec / 3600);
+            const m = Math.floor((diffSec % 3600) / 60);
+            const s = diffSec % 60;
+
+            timer.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+            // Update Price
+            const pk = timer.id.split('-')[1];
+            const priceEl = document.getElementById(`price-${pk}`);
+            if (priceEl) {
+                const rate = parseFloat(priceEl.dataset.rate);
+                const minutes = Math.max(1, diffSec / 60);
+                const currentPrice = (minutes * (rate / 60)).toFixed(2);
+                priceEl.textContent = `${currentPrice} ج.م`;
+            }
+        });
+    }
+
+    setInterval(updateTimers, 1000);
+    updateTimers();
+
+    window.onclick = function(event) {
+        if (event.target == document.getElementById('addQueueModal')) {
+            document.getElementById('addQueueModal').classList.remove('active');
+        }
+    }
+
+    // Filter devices based on activity type
+    const typeSelect = document.querySelector('select[name="activity_type_id"]');
+    const deviceSelect = document.getElementById('device_select');
+    
+    if (typeSelect && deviceSelect) {
+        const deviceOptions = Array.from(deviceSelect.options);
+
+        function filterDevices() {
+            const selectedType = typeSelect.value;
+            deviceSelect.innerHTML = '';
+            deviceOptions.forEach(opt => {
+                if (!opt.dataset.type || opt.dataset.type === selectedType) {
+                    deviceSelect.appendChild(opt);
+                }
+            });
+            deviceSelect.value = ""; // Reset to "Any"
+        }
+
+        typeSelect.addEventListener('change', filterDevices);
+        filterDevices(); // Initial filter
+    }
+</script>
 {% endblock %}

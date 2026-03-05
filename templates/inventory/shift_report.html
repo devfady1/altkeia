@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}تقرير جرد الشيفت{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <a href="{% url 'inventory_dashboard' %}" style="color:var(--text-muted);text-decoration:none;font-size:1.2rem;">←</a>
+        <h1 class="page-title" style="margin:0;">📊 تقرير جرد الشيفت</h1>
+    </div>
+    <!-- Shift Selector -->
+    <div style="display:flex;gap:8px;align-items:center;">
+        <select id="shiftSelect" onchange="window.location.href='?shift_id='+this.value" style="padding:8px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;font-size:0.85rem;">
+            <option value="">اختر شيفت...</option>
+            {% for s in recent_shifts %}
+            <option value="{{ s.pk }}" {% if shift and s.pk == shift.pk %}selected{% endif %}>
+                شيفت #{{ s.pk }} - {{ s.started_by.get_full_name|default:s.started_by.username }} - {{ s.started_at|date:"Y/m/d H:i" }}
+                {% if s.is_active %}(نشط){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+{% if shift %}
+<!-- Shift Info -->
+<div style="background:var(--bg-card);border-radius:16px;padding:18px;border:1px solid var(--border-color);margin-bottom:20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:0.85rem;">
+        <div>
+            <span style="color:var(--text-muted);">الشيفت:</span>
+            <strong>#{{ shift.pk }}</strong>
+        </div>
+        <div>
+            <span style="color:var(--text-muted);">بواسطة:</span>
+            <strong>{{ shift.started_by.get_full_name|default:shift.started_by.username }}</strong>
+        </div>
+        <div>
+            <span style="color:var(--text-muted);">البداية:</span>
+            <strong>{{ shift.started_at|date:"Y/m/d H:i" }}</strong>
+        </div>
+        <div>
+            <span style="color:var(--text-muted);">النهاية:</span>
+            <strong>{% if shift.ended_at %}{{ shift.ended_at|date:"Y/m/d H:i" }}{% else %}مستمر{% endif %}</strong>
+        </div>
+        <div>
+            {% if shift.is_active %}
+                <span style="background:rgba(46,204,113,0.15);color:#2ecc71;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">نشط</span>
+            {% else %}
+                <span style="background:rgba(149,165,166,0.15);color:#95a5a6;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">مغلق</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Summary Table -->
+{% if summary %}
+<div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);overflow:hidden;margin-bottom:24px;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);font-weight:700;">
+        📋 ملخص حركات الشيفت
+    </div>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--bg-secondary);font-size:0.8rem;color:var(--text-muted);">
+                    <th style="padding:10px 14px;text-align:right;">المادة</th>
+                    <th style="padding:10px 14px;text-align:center;">الوحدة</th>
+                    <th style="padding:10px 14px;text-align:center;">📥 وارد</th>
+                    <th style="padding:10px 14px;text-align:center;">📤 صادر</th>
+                    <th style="padding:10px 14px;text-align:center;">🗑️ هالك</th>
+                    <th style="padding:10px 14px;text-align:center;">🔧 تعديل</th>
+                    <th style="padding:10px 14px;text-align:center;">الرصيد الحالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summary %}
+                <tr style="border-bottom:1px solid var(--border-color);">
+                    <td style="padding:10px 14px;font-weight:600;">{{ s.item.name }}</td>
+                    <td style="padding:10px 14px;text-align:center;font-size:0.8rem;color:var(--text-muted);">{{ s.item.get_unit_display }}</td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if s.total_in > 0 %}<span style="color:#2ecc71;font-weight:600;">+{{ s.total_in|floatformat:1 }}</span>{% else %}-{% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if s.total_out > 0 %}<span style="color:#e74c3c;font-weight:600;">-{{ s.total_out|floatformat:1 }}</span>{% else %}-{% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if s.total_waste > 0 %}<span style="color:#9b59b6;font-weight:600;">-{{ s.total_waste|floatformat:1 }}</span>{% else %}-{% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if s.total_adjustment > 0 %}<span style="color:#3498db;font-weight:600;">{{ s.total_adjustment|floatformat:1 }}</span>{% else %}-{% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;font-weight:700;color:{% if s.item.stock_status == 'ok' %}#2ecc71{% elif s.item.stock_status == 'low' %}#f39c12{% else %}#e74c3c{% endif %};">
+                        {{ s.item.current_stock|floatformat:1 }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Detailed Transactions -->
+<div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);overflow:hidden;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);font-weight:700;">
+        📜 تفاصيل الحركات ({{ transactions|length }})
+    </div>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--bg-secondary);font-size:0.8rem;color:var(--text-muted);">
+                    <th style="padding:10px 14px;text-align:right;">الوقت</th>
+                    <th style="padding:10px 14px;text-align:right;">المادة</th>
+                    <th style="padding:10px 14px;text-align:center;">النوع</th>
+                    <th style="padding:10px 14px;text-align:center;">الكمية</th>
+                    <th style="padding:10px 14px;text-align:right;">السبب</th>
+                    <th style="padding:10px 14px;text-align:right;">بواسطة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr style="border-bottom:1px solid var(--border-color);">
+                    <td style="padding:10px 14px;font-size:0.8rem;color:var(--text-muted);">{{ txn.created_at|date:"H:i" }}</td>
+                    <td style="padding:10px 14px;font-weight:600;">{{ txn.inventory_item.name }}</td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if txn.transaction_type == 'in' %}
+                            <span style="background:rgba(46,204,113,0.15);color:#2ecc71;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">وارد</span>
+                        {% elif txn.transaction_type == 'out' %}
+                            <span style="background:rgba(231,76,60,0.15);color:#e74c3c;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">صادر</span>
+                        {% elif txn.transaction_type == 'waste' %}
+                            <span style="background:rgba(155,89,182,0.15);color:#9b59b6;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">هالك</span>
+                        {% else %}
+                            <span style="background:rgba(52,152,219,0.15);color:#3498db;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">تعديل</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;font-weight:600;">{{ txn.quantity|floatformat:1 }} {{ txn.inventory_item.get_unit_display }}</td>
+                    <td style="padding:10px 14px;font-size:0.85rem;">{{ txn.reason }}</td>
+                    <td style="padding:10px 14px;font-size:0.85rem;color:var(--text-muted);">{{ txn.created_by.get_full_name|default:"النظام" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="padding:30px;text-align:center;color:var(--text-muted);">
+                        لا توجد حركات في هذا الشيفت
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div style="padding:60px;text-align:center;color:var(--text-muted);background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);">
+    <div style="font-size:2rem;margin-bottom:12px;">📊</div>
+    <div>اختر شيفت لعرض تقرير الجرد</div>
+</div>
+{% endif %}
+{% endblock %}

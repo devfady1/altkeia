@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">جلسة #{{ session.pk }} - {{ session.primary_table.display_name }}</h1>
+        <h1 class="page-title">جلسة #{{ session.pk }} - {{ session.primary_table.display_name|default:"بدون طاولة" }}</h1>
         <p class="page-subtitle">{{ session.get_status_display }} · {{ session.duration }}</p>
     </div>
     <a href="{% url 'dashboard' %}" class="btn btn-ghost">← العودة للوحة التحكم</a>

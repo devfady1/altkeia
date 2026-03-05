@@ -22,21 +22,26 @@ def reports_dashboard(request):
     recent_shifts = CashierShift.objects.all()[:10]
     active_shift = CashierShift.objects.filter(is_active=True).first()
 
-    # Current month stats from shifts
+    # Current month stats from ALL payments/orders, not just closed shifts
     today = timezone.now().date()
     month_start = today.replace(day=1)
-    month_shifts = CashierShift.objects.filter(
-        started_at__date__gte=month_start,
-        is_active=False
-    )
-    month_revenue = month_shifts.aggregate(total=Sum('total_revenue'))['total'] or 0
-    month_orders = month_shifts.aggregate(total=Sum('total_orders'))['total'] or 0
+    
+    # Revenue is sum of all payments in the month
+    month_payments = Payment.objects.filter(paid_at__date__gte=month_start)
+    month_revenue = month_payments.aggregate(total=Sum('amount'))['total'] or 0
+    
+    # Orders are sum of all confirmed/completed orders in the month
+    month_orders_qs = Order.objects.filter(created_at__date__gte=month_start).exclude(status=Order.Status.CANCELLED)
+    month_orders = month_orders_qs.count()
+    
+    month_shifts = CashierShift.objects.filter(started_at__date__gte=month_start, is_active=False)
 
     # Active shift stats (live)
     active_revenue = 0
     active_orders = 0
     active_sessions = 0
     if active_shift:
+        # Include all payments during this shift's timeframe, even unassigned ones
         active_payments = Payment.objects.filter(paid_at__gte=active_shift.started_at)
         active_revenue = active_payments.aggregate(total=Sum('amount'))['total'] or 0
         active_orders = Order.objects.filter(
@@ -87,56 +92,61 @@ def shift_report(request, pk):
 
     shift = get_object_or_404(CashierShift, pk=pk)
 
-    # Sessions during this shift
     end_time = shift.ended_at or timezone.now()
+    
+    # To include items without a shift, we find the end time of the *previous* shift.
+    # Any item without a shift created between previous shift end and this shift end belongs to this report.
+    prev_shift = CashierShift.objects.filter(started_at__lt=shift.started_at).order_by('-started_at').first()
+    start_time = prev_shift.ended_at if prev_shift and prev_shift.ended_at else shift.started_at
+
+    from django.db.models import Q
+    
+    # Items belong to this shift if they were opened between start and end
+    # Note: TableSession doesn't have a 'shift' field, so we filter by opened_at
     sessions = TableSession.objects.filter(
-        opened_at__gte=shift.started_at,
+        opened_at__gte=start_time, 
         opened_at__lte=end_time,
         status='closed'
     ).select_related('primary_table')
 
-    payments = Payment.objects.filter(
-        paid_at__gte=shift.started_at,
-        paid_at__lte=end_time
-    )
+    pay_filter = Q(shift=shift) | (Q(shift__isnull=True) & Q(paid_at__gte=start_time, paid_at__lte=end_time))
+    payments = Payment.objects.filter(pay_filter)
 
+    # Filter activities by started_at within the shift timeframe
     activities = ActivitySession.objects.filter(
-        started_at__gte=shift.started_at,
+        started_at__gte=start_time, 
         started_at__lte=end_time,
         ended_at__isnull=False
     )
 
-    orders = Order.objects.filter(
-        created_at__gte=shift.started_at,
-        created_at__lte=end_time
-    ).exclude(status=Order.Status.CANCELLED)
+    ord_filter = Q(shift=shift) | (Q(shift__isnull=True) & Q(created_at__gte=start_time, created_at__lte=end_time))
+    orders = Order.objects.filter(ord_filter).exclude(status=Order.Status.CANCELLED)
+    
+    # We can pass out-of-shift payments specifically to the template if the user wants to see them
+    unassigned_payments = payments.filter(shift__isnull=True).select_related('paid_by')
 
-    # Staff deductions during this shift
-    staff_orders = StaffOrder.objects.filter(
-        created_at__gte=shift.started_at,
-        created_at__lte=end_time
-    ).select_related('employee', 'created_by')
-    staff_advances = StaffAdvance.objects.filter(
-        created_at__gte=shift.started_at,
-        created_at__lte=end_time
-    ).select_related('employee', 'created_by')
+    staff_filter = Q(shift=shift) | (Q(shift__isnull=True) & Q(created_at__gte=start_time, created_at__lte=end_time))
+    staff_orders = StaffOrder.objects.filter(staff_filter).select_related('employee', 'created_by')
+    staff_advances = StaffAdvance.objects.filter(staff_filter).select_related('employee', 'created_by')
+    
     staff_orders_total = staff_orders.aggregate(total=Sum('amount'))['total'] or 0
     staff_advances_total = staff_advances.aggregate(total=Sum('amount'))['total'] or 0
 
     context = {
         'shift': shift,
         'sessions': sessions,
-        'total_revenue': payments.aggregate(total=Sum('amount'))['total'] or 0,
-        'total_discount': payments.aggregate(total=Sum('discount'))['total'] or 0,
+        'total_revenue': round(float(payments.aggregate(total=Sum('amount'))['total'] or 0), 2),
+        'total_discount': round(float(payments.aggregate(total=Sum('discount'))['total'] or 0), 2),
         'sessions_count': sessions.count(),
         'orders_count': orders.count(),
-        'activities_revenue': activities.aggregate(total=Sum('total_price'))['total'] or 0,
+        'activities_revenue': round(float(activities.aggregate(total=Sum('total_price'))['total'] or 0), 2),
         'activities_count': activities.count(),
         'staff_orders': staff_orders,
         'staff_advances': staff_advances,
-        'staff_orders_total': staff_orders_total,
-        'staff_advances_total': staff_advances_total,
-        'staff_deductions_total': staff_orders_total + staff_advances_total,
+        'staff_orders_total': round(float(staff_orders_total), 2),
+        'staff_advances_total': round(float(staff_advances_total), 2),
+        'staff_deductions_total': round(float(staff_orders_total + staff_advances_total), 2),
+        'unassigned_payments': unassigned_payments,
     }
     return render(request, 'reports/shift_report.html', context)
 
@@ -163,14 +173,20 @@ def monthly_report(request):
         is_active=False
     )
 
+    # Revenue and Orders from all records in this month (not just from shifts)
+    month_payments = Payment.objects.filter(paid_at__gte=month_start, paid_at__lt=next_month)
+    total_revenue = month_payments.aggregate(total=Sum('amount'))['total'] or 0
+    total_discount = month_payments.aggregate(total=Sum('discount'))['total'] or 0
+    total_orders = Order.objects.filter(created_at__gte=month_start, created_at__lt=next_month).exclude(status=Order.Status.CANCELLED).count()
+
     context = {
         'month': month,
         'year': year,
         'shifts': shifts,
-        'total_revenue': shifts.aggregate(total=Sum('total_revenue'))['total'] or 0,
-        'total_orders': shifts.aggregate(total=Sum('total_orders'))['total'] or 0,
+        'total_revenue': total_revenue,
+        'total_orders': total_orders,
         'total_sessions': shifts.aggregate(total=Sum('total_sessions'))['total'] or 0,
-        'total_discount': shifts.aggregate(total=Sum('total_discount'))['total'] or 0,
+        'total_discount': total_discount,
         'shifts_count': shifts.count(),
     }
     return render(request, 'reports/monthly_report.html', context)
@@ -184,14 +200,17 @@ def invoice_list(request):
     shift_id = request.GET.get('shift_id')
     active_shift = CashierShift.objects.filter(is_active=True).first()
     
-    if shift_id:
+    if shift_id == 'none':
+        selected_shift = None
+        payments = Payment.objects.filter(shift__isnull=True).select_related('session__primary_table', 'paid_by').order_by('-paid_at')
+    elif shift_id:
         selected_shift = get_object_or_404(CashierShift, pk=shift_id)
-        payments = Payment.objects.filter(shift=selected_shift).select_related('session__primary_table', 'paid_by')
+        payments = Payment.objects.filter(shift=selected_shift).select_related('session__primary_table', 'paid_by').order_by('-paid_at')
     else:
         # Default to active shift or most recent
         selected_shift = active_shift or CashierShift.objects.order_by('-started_at').first()
         if selected_shift:
-            payments = Payment.objects.filter(shift=selected_shift).select_related('session__primary_table', 'paid_by')
+            payments = Payment.objects.filter(shift=selected_shift).select_related('session__primary_table', 'paid_by').order_by('-paid_at')
         else:
             payments = Payment.objects.none()
             
@@ -224,7 +243,11 @@ def start_shift(request):
             'started_by': str(existing.started_by),
         }, status=400)
 
-    shift = CashierShift.objects.create(started_by=request.user)
+    import json
+    body = json.loads(request.body) if request.body else {}
+    s_type = body.get('shift_type', CashierShift.ShiftType.MORNING)
+    
+    shift = CashierShift.objects.create(started_by=request.user, shift_type=s_type)
     # 12-hour format for response
     started_at_str = shift.started_at.strftime('%I:%M %p').replace('AM', 'ص').replace('PM', 'م')
     return JsonResponse({
@@ -283,3 +306,21 @@ def shift_status(request):
         'revenue': float(active_revenue),
         'orders': active_orders,
     })
+
+@login_required
+@require_POST
+def print_shift_report_api(request, pk):
+    """طباعة تقرير الشيفت (4 ريسيت)"""
+    if not (request.user.is_owner or request.user.is_manager or request.user.is_cashier):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+        
+    try:
+        from core.printer import print_shift_report
+        success = print_shift_report(shift_id=pk, printed_by=request.user)
+        if success:
+            return JsonResponse({'success': True, 'message': 'جاري طباعة تقرير الشيفت...'})
+        else:
+            return JsonResponse({'error': 'فشلت الطباعة. تأكد من توصيل الطابعة.'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+

@@ -31,7 +31,7 @@
                             <span class="fw-bold text-success">{{ act.running_cost }} ج.م</span>
                         </div>
                         <div class="text-muted" style="font-size:0.8rem;margin-top:4px;">
-                            {{ act.session.primary_table.display_name }}
+                            {{ act.session.primary_table.display_name|default:"بدون طاولة" }}
                         </div>
                         {% endif %}
                     {% endfor %}

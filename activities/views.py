@@ -16,19 +16,37 @@ def start_activity(request):
     if request.method == 'POST':
         device_id = request.POST.get('device_id')
         session_id = request.POST.get('session_id')
+        
+        from activities.models import Device, ActivityType
+        from tables.models import Table
+        from queue_system.models import QueueEntry
+        
         device = get_object_or_404(Device, pk=device_id)
         session = get_object_or_404(TableSession, pk=session_id)
+        table = session.primary_table
 
-        device.status = Device.Status.BUSY
-        device.save()
+        # Instead of starting activity, add to queue
+        last = QueueEntry.objects.filter(
+            activity_type=device.activity_type,
+            status=QueueEntry.Status.WAITING
+        ).order_by('-position').first()
+        position = (last.position + 1) if last else 1
 
-        ActivitySession.objects.create(device=device, session=session)
+        QueueEntry.objects.create(
+            activity_type=device.activity_type,
+            table=table,
+            session=session,
+            customer_name=table.display_name,
+            position=position,
+            status=QueueEntry.Status.WAITING
+        )
 
-        # Update table status
-        session.primary_table.status = Table.Status.ACTIVITY
-        session.primary_table.save()
+        # Update table status to PENDING if it was EMPTY
+        if table.status == Table.Status.EMPTY:
+            table.status = Table.Status.PENDING
+            table.save()
 
-    return redirect('dashboard')
+    return redirect('queue_list')
 
 
 @login_required

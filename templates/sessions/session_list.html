@@ -9,7 +9,7 @@
     <a href="{% url 'session_detail' session.pk %}" class="kitchen-card fade-in" style="text-decoration:none;color:inherit;cursor:pointer;">
         <div class="kitchen-card-header">
             <div>
-                <strong>{{ session.primary_table.display_name }}</strong>
+                <strong>{{ session.primary_table.display_name|default:"بدون طاولة" }}</strong>
                 <span class="text-muted" style="font-size:0.8rem;margin-right:8px;">{{ session.opened_at|time:"H:i" }}</span>
             </div>
             <span class="badge {% if session.status == 'active' %}badge-success{% else %}badge-info{% endif %}">{{ session.get_status_display }}</span>

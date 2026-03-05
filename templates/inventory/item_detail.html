@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}{{ item.name }} - المخزون{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <a href="{% url 'inventory_dashboard' %}" style="color:var(--text-muted);text-decoration:none;font-size:1.2rem;">←</a>
+        <h1 class="page-title" style="margin:0;">{{ item.name }}</h1>
+        <span style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);padding:4px 10px;border-radius:8px;">{{ item.get_unit_display }}</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('editModal').style.display='flex'" style="padding:8px 16px;border-radius:10px;background:rgba(52,152,219,0.15);color:#3498db;border:none;cursor:pointer;font-family:var(--font);font-size:0.85rem;">✏️ تعديل</button>
+        <button onclick="document.getElementById('adjustModal').style.display='flex'" style="padding:8px 16px;border-radius:10px;background:rgba(155,89,182,0.15);color:#9b59b6;border:none;cursor:pointer;font-family:var(--font);font-size:0.85rem;">🔧 تعديل جرد</button>
+    </div>
+</div>
+
+<!-- Info Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;">
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">الكمية الحالية</div>
+        <div style="font-size:1.8rem;font-weight:700;color:{% if item.stock_status == 'ok' %}#2ecc71{% elif item.stock_status == 'low' %}#f39c12{% else %}#e74c3c{% endif %};">
+            {{ item.current_stock|floatformat:1 }}
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">{{ item.get_unit_display }}</div>
+    </div>
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">الحد الأدنى</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--text-primary);">{{ item.minimum_stock|floatformat:1 }}</div>
+    </div>
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">تكلفة الوحدة</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--text-primary);">{{ item.cost_per_unit|floatformat:2 }} جنيه</div>
+    </div>
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border-color);">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">الحالة</div>
+        <div style="font-size:1.2rem;font-weight:700;">
+            {% if item.stock_status == 'ok' %}
+                <span style="color:#2ecc71;">متوفر ✅</span>
+            {% elif item.stock_status == 'low' %}
+                <span style="color:#f39c12;">منخفض ⚠️</span>
+            {% else %}
+                <span style="color:#e74c3c;">نفد 🚫</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Products using this item -->
+{% if product_usages %}
+<div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);margin-bottom:24px;overflow:hidden;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);font-weight:700;">
+        🔗 المنتجات المرتبطة ({{ product_usages.count }})
+    </div>
+    <div style="padding:16px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% for pi in product_usages %}
+            <div style="background:var(--bg-secondary);padding:8px 14px;border-radius:10px;font-size:0.85rem;border:1px solid var(--border-color);">
+                <span style="font-weight:600;">{{ pi.product.name }}</span>
+                <span style="color:var(--text-muted);margin-inline-start:6px;">{{ pi.quantity_used|floatformat:1 }} {{ item.get_unit_display }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Transactions History -->
+<div style="background:var(--bg-card);border-radius:16px;border:1px solid var(--border-color);overflow:hidden;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);font-weight:700;">
+        📜 سجل الحركات
+    </div>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--bg-secondary);font-size:0.8rem;color:var(--text-muted);">
+                    <th style="padding:10px 14px;text-align:right;">التاريخ</th>
+                    <th style="padding:10px 14px;text-align:center;">النوع</th>
+                    <th style="padding:10px 14px;text-align:center;">الكمية</th>
+                    <th style="padding:10px 14px;text-align:right;">السبب</th>
+                    <th style="padding:10px 14px;text-align:right;">بواسطة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr style="border-bottom:1px solid var(--border-color);">
+                    <td style="padding:10px 14px;font-size:0.8rem;color:var(--text-muted);">{{ txn.created_at|date:"Y/m/d H:i" }}</td>
+                    <td style="padding:10px 14px;text-align:center;">
+                        {% if txn.transaction_type == 'in' %}
+                            <span style="background:rgba(46,204,113,0.15);color:#2ecc71;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">📥 وارد</span>
+                        {% elif txn.transaction_type == 'out' %}
+                            <span style="background:rgba(231,76,60,0.15);color:#e74c3c;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">📤 صادر</span>
+                        {% elif txn.transaction_type == 'waste' %}
+                            <span style="background:rgba(155,89,182,0.15);color:#9b59b6;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">🗑️ هالك</span>
+                        {% else %}
+                            <span style="background:rgba(52,152,219,0.15);color:#3498db;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;">🔧 تعديل</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px 14px;text-align:center;font-weight:600;">{{ txn.quantity|floatformat:1 }}</td>
+                    <td style="padding:10px 14px;font-size:0.85rem;">{{ txn.reason }}{% if txn.notes %} <span style="color:var(--text-muted);">({{ txn.notes }})</span>{% endif %}</td>
+                    <td style="padding:10px 14px;font-size:0.85rem;color:var(--text-muted);">{{ txn.created_by.get_full_name|default:"النظام" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding:30px;text-align:center;color:var(--text-muted);">لا توجد حركات بعد</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-card);border-radius:20px;padding:28px;width:100%;max-width:450px;border:1px solid var(--border-color);box-shadow:0 25px 50px rgba(0,0,0,0.4);">
+        <h3 style="margin:0 0 20px 0;">✏️ تعديل - {{ item.name }}</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_item">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الاسم</label>
+                    <input type="text" name="name" value="{{ item.name }}" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الوحدة</label>
+                    <select name="unit" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                        {% for value, label in unit_choices %}
+                        <option value="{{ value }}" {% if value == item.unit %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الحد الأدنى</label>
+                        <input type="number" name="minimum_stock" step="0.001" value="{{ item.minimum_stock }}" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">تكلفة الوحدة</label>
+                        <input type="number" name="cost_per_unit" step="0.01" value="{{ item.cost_per_unit }}" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" onclick="document.getElementById('editModal').style.display='none'" style="padding:8px 20px;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer;font-family:var(--font);">إلغاء</button>
+                <button type="submit" style="padding:8px 20px;border-radius:10px;background:linear-gradient(135deg,#3498db,#2980b9);color:#fff;border:none;cursor:pointer;font-family:var(--font);font-weight:600;">حفظ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Adjust Stock Modal -->
+<div id="adjustModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-card);border-radius:20px;padding:28px;width:100%;max-width:400px;border:1px solid var(--border-color);box-shadow:0 25px 50px rgba(0,0,0,0.4);">
+        <h3 style="margin:0 0 20px 0;">🔧 تعديل جرد - {{ item.name }}</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px 0;">الكمية الحالية: <strong>{{ item.current_stock|floatformat:1 }} {{ item.get_unit_display }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="adjust_stock">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">الكمية الجديدة بعد الجرد *</label>
+                    <input type="number" name="new_stock" step="0.001" required value="{{ item.current_stock }}" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">ملاحظات</label>
+                    <input type="text" name="notes" placeholder="سبب التعديل..." style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font);outline:none;box-sizing:border-box;">
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" onclick="document.getElementById('adjustModal').style.display='none'" style="padding:8px 20px;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer;font-family:var(--font);">إلغاء</button>
+                <button type="submit" style="padding:8px 20px;border-radius:10px;background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:none;cursor:pointer;font-family:var(--font);font-weight:600;">حفظ الجرد</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+['editModal', 'adjustModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; });
+});
+</script>
+{% endblock %}

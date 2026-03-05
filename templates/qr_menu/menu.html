@@ -43,8 +43,8 @@
 
         /* Layout Grid for Desktop */
         .app-grid {
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-direction: column;
             max-width: 1400px;
             margin: 0 auto;
             min-height: 100vh;
@@ -52,14 +52,18 @@
 
         @media (min-width: 1024px) {
             .app-grid {
+                display: grid;
                 grid-template-columns: 280px 1fr 340px;
                 gap: 20px;
                 padding: 20px;
             }
-            .header-nav { display: none; } /* Use sidebar on desktop */
+            .header-nav { display: none !important; }
             .mobile-bottom-bar { display: none !important; }
             .desktop-sidebar { display: block !important; }
             .desktop-cart { display: flex !important; }
+            .sidebar-header { display: block !important; }
+            .desktop-bill-btn { display: flex !important; }
+            .mobile-bill-btn { display: none !important; }
             .cats-wrap { 
                 position: sticky; 
                 top: 20px; 
@@ -76,6 +80,10 @@
             }
             .menu-wrap { padding: 0; }
         }
+
+        /* Elements hidden on mobile by default */
+        .sidebar-header { display: none; }
+        .desktop-bill-btn { display: none; }
 
         /* Header */
         .header {
@@ -117,11 +125,13 @@
             display: flex;
             gap: 10px;
             overflow-x: auto;
-            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
             z-index: 90;
         }
         .cats-wrap::-webkit-scrollbar { display: none; }
         .cat-chip {
+            flex-shrink: 0;
             padding: 10px 20px;
             border-radius: 25px;
             background: var(--card);
@@ -204,6 +214,7 @@
         .prod-img-box {
             width: 70px;
             height: 70px;
+            flex-shrink: 0;
             border-radius: var(--rs);
             background: linear-gradient(45deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
             display: flex;
@@ -256,6 +267,7 @@
         .qty-btn {
             width: 40px;
             height: 40px;
+            flex-shrink: 0;
             border-radius: 50%;
             border: none;
             background: var(--grad);
@@ -425,9 +437,22 @@
 
 <body>
     <div class="app-grid">
+        <!-- Mobile Header (Top) -->
+        <div class="header header-nav">
+            <div class="header-top">
+                <span class="logo">☕ المنيو</span>
+                <span class="table-badge">{{ table.display_name }}</span>
+                {% if session %}
+                <a href="{% url 'qr_bill' table.uuid %}" class="table-badge mobile-bill-btn" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); text-decoration: none; display: flex; align-items: center; gap: 5px;">
+                    📄 <span style="font-size: 0.75rem;">فاتورتي</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Sidebar (Desktop) / Categories (Mobile) -->
         <aside class="desktop-sidebar">
-            <div class="header">
+            <div class="header sidebar-header">
                 <div class="header-top">
                     <span class="logo">☕ المنيو</span>
                     <span class="table-badge">{{ table.display_name }}</span>
@@ -443,8 +468,8 @@
             </div>
             
             {% if session %}
-            <div style="padding: 20px;">
-                <a href="{% url 'qr_bill' table.uuid %}" class="cat-chip" style="justify-content: center; background: rgba(255,255,255,0.05);">
+            <div style="padding: 20px;" class="desktop-bill-btn">
+                <a href="{% url 'qr_bill' table.uuid %}" class="cat-chip" style="width: 100%; justify-content: center; background: rgba(255,255,255,0.05); text-decoration: none;">
                     📄 عرض الفاتورة الحالية
                 </a>
             </div>
@@ -453,14 +478,6 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Mobile Header -->
-            <div class="header header-nav">
-                <div class="header-top">
-                    <span class="logo">☕ المنيو</span>
-                    <span class="table-badge">{{ table.display_name }}</span>
-                </div>
-            </div>
-
             <div class="menu-wrap">
                 {% for category in categories %}
                 <div class="section-title cat-title c{{ category.pk }}">

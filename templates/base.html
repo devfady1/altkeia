@@ -44,6 +44,10 @@
                     <span class="icon">🧾</span>
                     <span>مراجعة الفواتير</span>
                 </a>
+                <a href="{% url 'inventory_dashboard' %}" class="nav-item {% if 'inventory' in request.path %}active{% endif %}">
+                    <span class="icon">📦</span>
+                    <span>المخزون</span>
+                </a>
                 <a href="{% url 'manage' %}" class="nav-item {% if 'manage' in request.path %}active{% endif %}">
                     <span class="icon">⚙️</span>
                     <span>الإدارة</span>
@@ -99,7 +103,7 @@
                         <span class="shift-status-dot inactive"></span>
                         <span class="shift-label">لا يوجد شيفت مفتوح</span>
                     </div>
-                    <button class="btn-shift btn-shift-start" onclick="startShift()">
+                    <button class="btn-shift btn-shift-start" onclick="showStartShiftModal()">
                         بدء شيفت ▶️
                     </button>
                 </div>
@@ -114,6 +118,48 @@
 
     <!-- End Shift Confirmation Modal (Body level for best z-index) -->
     {% if request.user.is_cashier or request.user.is_owner or request.user.is_manager %}
+    <!-- Start Shift Modal -->
+    <div class="shift-modal-overlay" id="startShiftModal" style="display:none; z-index: 1000000;">
+        <div class="shift-modal-box">
+            <div class="modal-header">
+                <h3>☀️ بدء شيفت جديد</h3>
+            </div>
+            <div class="modal-body">
+                <p>يرجى اختيار نوع الشيفت:</p>
+                <div class="shift-type-options" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:15px;">
+                    <label class="shift-type-card" style="cursor:pointer; text-align:center; padding:15px; border:1px solid var(--border-color); border-radius:12px; transition:all 0.2s;">
+                        <input type="radio" name="shift_type_radio" value="morning" checked style="display:none;">
+                        <div style="font-size:1.5rem; margin-bottom:5px;">🌅</div>
+                        <div style="font-weight:600;">صباحي</div>
+                    </label>
+                    <label class="shift-type-card" style="cursor:pointer; text-align:center; padding:15px; border:1px solid var(--border-color); border-radius:12px; transition:all 0.2s;">
+                        <input type="radio" name="shift_type_radio" value="afternoon" style="display:none;">
+                        <div style="font-size:1.5rem; margin-bottom:5px;">🌃</div>
+                        <div style="font-weight:600;">بيات</div>
+                    </label>
+                    <label class="shift-type-card" style="cursor:pointer; text-align:center; padding:15px; border:1px solid var(--border-color); border-radius:12px; transition:all 0.2s;">
+                        <input type="radio" name="shift_type_radio" value="night" style="display:none;">
+                        <div style="font-size:1.5rem; margin-bottom:5px;">🌙</div>
+                        <div style="font-weight:600;">ليلي</div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="hideStartShiftModal()">إلغاء</button>
+                <button class="btn btn-primary" onclick="confirmStartShift()">بدء الآن ✨</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSS for select state (managed by JS) -->
+    <style>
+        .shift-type-card.selected {
+            background: rgba(var(--accent-rgb, 52, 152, 219), 0.15);
+            border-color: var(--accent-primary, #3498db) !important;
+            transform: translateY(-2px);
+        }
+    </style>
+
     <div class="shift-modal-overlay" id="endShiftModal" style="display:none; z-index: 1000000;">
         <div class="shift-modal-box">
             <div class="modal-header">
@@ -379,10 +425,38 @@
     startShiftTimer();
     {% endif %}
 
-    async function startShift() {
-        console.log("Starting shift...");
+    function showStartShiftModal() {
+        const modal = document.getElementById('startShiftModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            // Simple selection logic
+            const cards = modal.querySelectorAll('.shift-type-card');
+            cards.forEach(card => {
+                card.onclick = function() {
+                    cards.forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+                    this.querySelector('input').checked = true;
+                };
+            });
+            // Select first as default
+            cards[0].classList.add('selected');
+        }
+    }
+
+    function hideStartShiftModal() {
+        const modal = document.getElementById('startShiftModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmStartShift() {
+        const type = document.querySelector('input[name="shift_type_radio"]:checked').value;
+        startShift(type);
+    }
+
+    async function startShift(type = 'morning') {
+        console.log("Starting shift type:", type);
         try {
-            const data = await apiPost('/reports/shift/start/');
+            const data = await apiPost('/reports/shift/start/', { shift_type: type });
             if (data.success) {
                 showToast(data.message);
                 setTimeout(() => location.reload(), 800);
@@ -474,6 +548,15 @@
         setInterval(updateQRBadge, 20000);
     }
 
+
+    // ===== Django Messages to Toast =====
+    {% if messages %}
+    document.addEventListener('DOMContentLoaded', () => {
+        {% for message in messages %}
+            showToast("{{ message|escapejs }}", "{{ message.tags|default:'info' }}");
+        {% endfor %}
+    });
+    {% endif %}
 
     </script>
     {% block extra_js %}{% endblock %}

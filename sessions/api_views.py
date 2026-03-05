@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
 from .models import TableSession
@@ -23,7 +23,8 @@ def session_detail_api(request, pk):
             'created_at': order.created_at.strftime('%I:%M %p').replace('AM', 'ص').replace('PM', 'م'),
             'items': [
                 {
-                    'product': item.product.name,
+                    'id': item.pk,
+                    'product': item.display_name,
                     'quantity': item.quantity,
                     'price': float(item.price),
                     'subtotal': float(item.subtotal),
@@ -42,6 +43,7 @@ def session_detail_api(request, pk):
             'duration': act.duration_display,
             'cost': float(act.running_cost),
             'ended': act.ended_at is not None,
+            'is_paid': act.payments.exists(),
         })
 
     return JsonResponse({
@@ -57,6 +59,8 @@ def session_detail_api(request, pk):
         'total_orders': float(session.total_orders),
         'total_activities': float(session.total_activities),
         'total_amount': float(session.total_amount),
+        'total_paid': float(session.total_paid),
+        'remaining_amount': float(session.remaining_amount),
         'orders': orders_data,
         'activities': activities_data,
         'opened_at': session.opened_at.strftime('%I:%M %p').replace('AM', 'ص').replace('PM', 'م'),
@@ -82,6 +86,40 @@ def merge_tables_api(request, pk):
     table_id = body.get('table_id')
     table = get_object_or_404(Table, pk=table_id)
     session.merge_table(table)
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def transfer_session_api(request, pk):
+    """تشفيت - نقل الجلسة بالكامل إلى طاولة أخرى"""
+    session = get_object_or_404(TableSession, pk=pk)
+    body = json.loads(request.body)
+    new_table_id = body.get('table_id')
+    
+    new_table = get_object_or_404(Table, pk=new_table_id)
+    
+    # Check if the new table is already occupied
+    if new_table.status != Table.Status.EMPTY and new_table.status != Table.Status.RESERVED:
+        return JsonResponse({'error': 'الطاولة الجديدة غير متاحة أو مشغولة'}, status=400)
+        
+    old_primary_table = session.primary_table
+    old_tables = list(session.tables.all())
+    
+    # Release old tables
+    for t in old_tables:
+        t.status = Table.Status.EMPTY
+        t.save()
+        session.tables.remove(t)
+        
+    # Assign new table
+    session.primary_table = new_table
+    session.tables.add(new_table)
+    session.save()
+    
+    new_table.status = Table.Status.OCCUPIED
+    new_table.save()
+    
     return JsonResponse({'success': True})
 
 
@@ -117,7 +155,8 @@ def session_by_table_api(request, table_id):
             'created_at': order.created_at.strftime('%I:%M %p').replace('AM', 'ص').replace('PM', 'م'),
             'items': [
                 {
-                    'product': item.product.name,
+                    'id': item.pk,
+                    'product': item.display_name,
                     'quantity': item.quantity,
                     'price': float(item.price),
                     'subtotal': float(item.subtotal),
@@ -136,6 +175,7 @@ def session_by_table_api(request, table_id):
             'duration': act.duration_display,
             'cost': float(act.running_cost),
             'ended': act.ended_at is not None,
+            'is_paid': act.payments.exists(),
         })
 
     return JsonResponse({
@@ -151,6 +191,8 @@ def session_by_table_api(request, table_id):
         'total_orders': float(session.total_orders),
         'total_activities': float(session.total_activities),
         'total_amount': float(session.total_amount),
+        'total_paid': float(session.total_paid),
+        'remaining_amount': float(session.remaining_amount),
         'orders': orders_data,
         'activities': activities_data,
         'opened_at': session.opened_at.strftime('%I:%M %p').replace('AM', 'ص').replace('PM', 'م'),
@@ -274,11 +316,76 @@ def edit_session_items_api(request, pk):
 
     session.calculate_total()
     
-    if hasattr(session, 'payment'):
-        payment = session.payment
-        payment.amount = session.total_amount
-        payment.save()
-        if payment.shift and not payment.shift.is_active:
-            payment.shift.recalculate_totals()
+    # Update last payment amount if session is already closed/paying
+    last_payment = session.payments.order_by('-paid_at').first()
+    if last_payment:
+        # Re-calculate remaining if it's the final payment
+        last_payment.amount = float(session.total_amount) - float(session.total_paid) + float(last_payment.amount)
+        last_payment.save()
+        if last_payment.shift and not last_payment.shift.is_active:
+            last_payment.shift.recalculate_totals()
             
-    return JsonResponse({'success': True, 'message': 'تم تحديث الفاتورة بنجاح! ✨'})
+    # Reprint updated kitchen receipts to replace the old ones
+    try:
+        from core.printer import print_kitchen_receipt
+        for ordr in session.orders.exclude(status=Order.Status.CANCELLED):
+            if ordr.items.exists():
+                print_kitchen_receipt(ordr)
+    except Exception as e:
+        print(f"Error re-printing kitchen receipts on edit: {e}")
+        
+    return JsonResponse({'success': True, 'message': 'تم تعديل الطلبات'})
+
+@require_http_methods(["POST"])
+@login_required
+def add_percentage_api(request, pk):
+    """
+    Adds a percentage surcharge or discount as a virtual order item to the session.
+    Only accessible by owners/managers.
+    """
+    session = get_object_or_404(TableSession, pk=pk)
+    
+    user = request.user
+    if not (user.is_manager or user.is_owner):
+        return JsonResponse({'error': 'غير مصرح بإضافة نسبة'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        percentage = float(data.get('percentage', 0))
+        base_total = float(data.get('total', 0))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return JsonResponse({'error': 'بيانات غير صحيحة'}, status=400)
+
+    if percentage == 0:
+        return JsonResponse({'success': True})
+
+    amount = base_total * (percentage / 100)
+    
+    from orders.models import OrderItem, Order
+    from reports.models import CashierShift
+    
+    # Needs an order to attach to
+    order = session.orders.exclude(status=Order.Status.CANCELLED).first()
+    if not order:
+        active_shift = CashierShift.objects.filter(is_active=True).first()
+        order = Order.objects.create(
+            session=session,
+            table=session.primary_table,
+            status=Order.Status.DELIVERED,
+            shift=active_shift,
+            confirmed_by=user
+        )
+
+    label = f"إضافة نسبة ({percentage}%)" if percentage > 0 else f"خصم نسبة ({abs(percentage)}%)"
+    
+    OrderItem.objects.create(
+        order=order,
+        product=None,
+        label=label,
+        quantity=1,
+        price=amount, # Can be negative for discount
+        notes=f"تم الإضافة بواسطة {user.username}"
+    )
+
+    session.calculate_total()
+    return JsonResponse({'success': True, 'new_total': session.total_amount})

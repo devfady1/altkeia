@@ -88,6 +88,7 @@
         <thead>
             <tr>
                 <th>#</th>
+                <th>نوع الشيفت</th>
                 <th>الكاشير</th>
                 <th>البداية</th>
                 <th>النهاية</th>
@@ -101,6 +102,7 @@
             {% for s in recent_shifts %}
             <tr>
                 <td>{{ s.pk }}</td>
+                <td><span class="badge badge-info">{{ s.get_shift_type_display }}</span></td>
                 <td>{{ s.started_by.get_full_name|default:s.started_by.username }}</td>
                 <td>{{ s.started_at|date:"m/d h:i A" }}</td>
                 <td>{% if s.ended_at %}{{ s.ended_at|date:"m/d h:i A" }}{% else %}—{% endif %}</td>

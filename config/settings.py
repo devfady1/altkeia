@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'reports',
     'notifications',
     'qr_menu',
+    'inventory',
 ]
 
 # Remove daphne if not installed

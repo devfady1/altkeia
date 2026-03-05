@@ -23,6 +23,18 @@ def order_items_json(order):
     return json.dumps(items_data)
 
 @register.filter
+def sum_amounts(payments):
+    """Sums the amount field of a queryset of payments."""
+    from django.db.models import Sum
+    return payments.aggregate(total=Sum('amount'))['total'] or 0
+
+@register.filter
+def sum_discounts(payments):
+    """Sums the discount field of a queryset of payments."""
+    from django.db.models import Sum
+    return payments.aggregate(total=Sum('discount'))['total'] or 0
+
+@register.filter
 def session_items_json(session):
     """
     Returns a JSON string of all order items in a session for the edit modal:

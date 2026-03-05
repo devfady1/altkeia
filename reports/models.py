@@ -6,11 +6,22 @@ from django.utils import timezone
 class CashierShift(models.Model):
     """شيفت الكاشير"""
 
+    class ShiftType(models.TextChoices):
+        MORNING = 'morning', 'صباحي'
+        AFTERNOON = 'afternoon', 'بيات'
+        NIGHT = 'night', 'ليلي'
+
     started_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='started_shifts',
         verbose_name='بدأ بواسطة'
+    )
+    shift_type = models.CharField(
+        max_length=20,
+        choices=ShiftType.choices,
+        default=ShiftType.MORNING,
+        verbose_name='نوع الشيفت'
     )
     started_at = models.DateTimeField(auto_now_add=True, verbose_name='وقت البداية')
     ended_at = models.DateTimeField(null=True, blank=True, verbose_name='وقت النهاية')
@@ -50,7 +61,7 @@ class CashierShift(models.Model):
 
     def __str__(self):
         status = 'نشط' if self.is_active else 'مغلق'
-        return f"شيفت #{self.pk} - {self.started_by} ({status})"
+        return f"شيفت {self.get_shift_type_display()} #{self.pk} - {self.started_by} ({status})"
 
     @property
     def duration(self):

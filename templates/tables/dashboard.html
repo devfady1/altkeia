@@ -182,12 +182,15 @@
         <h1 class="page-title">لوحة التحكم</h1>
         <p class="page-subtitle">إدارة الطاولات والجلسات</p>
     </div>
-    <div class="status-legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span> فارغة</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--danger)"></span> مشغولة</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span> طلبات معلقة</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> نشاط</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--info)"></span> محجوزة</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="openTakeawayOrder()" style="font-size:1rem;padding:10px 24px;">🛍️ تيك أواي</button>
+        <div class="status-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span> فارغة</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--danger)"></span> مشغولة</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span> طلبات معلقة</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> نشاط</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--info)"></span> محجوزة</div>
+        </div>
     </div>
 </div>
 
@@ -427,6 +430,11 @@
     }
 
     function renderSessionPanel(session) {
+        // Show merged table names in panel title
+        if (session.tables && session.tables.length > 1) {
+            document.getElementById('panelTitle').textContent = session.tables.map(t => t.name).join(' & ');
+        }
+
         let ordersHtml = '';
         if (session.orders && session.orders.length > 0) {
             session.orders.forEach(order => {
@@ -455,9 +463,7 @@
                         <span class="fw-bold">${order.total} ج.م</span>
                     </div>
                     <div class="d-flex gap-1 mt-1" style="gap:5px;">
-                        ${(window.isManager || window.isOwner) ? `
                         <button class="btn btn-primary btn-sm btn-block" onclick='editOrderItems(${order.id}, ${JSON.stringify(order.items.map(i => ({id:i.id, name:i.product, qty:i.quantity})))})'>📝 تعديل الأصناف</button>
-                        ` : ''}
                         
                         ${order.status === 'pending' ? `
                             <button class="btn btn-success btn-sm btn-block" onclick="updateOrderStatus(${order.id}, 'confirmed')">✓ تأكيد</button>
@@ -485,8 +491,8 @@
                             <div class="text-muted" style="font-size:0.8rem;">${act.type} - ${act.duration}</div>
                         </div>
                         <div style="text-align:left;">
-                            <div class="fw-bold text-success">${act.cost} ج.م</div>
-                            ${!act.ended ? `<button class="btn btn-danger btn-sm mt-1" onclick="endActivity(${act.id})">إنهاء</button>` : '<span class="badge badge-success">مكتمل</span>'}
+                            <div class="fw-bold text-success">${act.cost.toFixed(2)} ج.م</div>
+                            ${act.is_paid ? '<span class="badge badge-outline-success mt-1">✓ مدفوع</span>' : (!act.ended ? `<button class="btn btn-danger btn-sm mt-1" onclick="endActivity(${act.id})">إنهاء</button>` : '<span class="badge badge-success">مكتمل</span>')}
                         </div>
                     </div>
                 </div>
@@ -504,7 +510,7 @@
                 <div><div class="stat-value" style="font-size:1.1rem;">${session.guest_count}</div><div class="stat-label">ضيوف</div></div>
             </div>
             <div class="stat-card" style="flex:1;padding:12px;">
-                <div><div class="stat-value" style="font-size:1.1rem;">${session.tables.length}</div><div class="stat-label">طاولات</div></div>
+                <div><div class="stat-value" style="font-size:1.1rem;">${session.total_paid.toFixed(2)}</div><div class="stat-label">تم دفعه</div></div>
             </div>
         </div>
 
@@ -521,16 +527,31 @@
         ` : ''}
     `;
 
+        document.getElementById('panelTotal').textContent = `${session.remaining_amount.toFixed(2)} ج.م`;
+        document.getElementById('panelTotal').parentElement.querySelector('span').textContent = 'المتبقي';
+        
+        const displayTotal = session.remaining_amount;
+
+        // Store session total for percentage calculations
+        window._currentSessionTotal = displayTotal;
+        window._currentSessionId = session.id;
+        window._percentageAdjustment = 0;
+
+        const isOwnerOrManager = {% if user.is_owner or user.is_manager %}true{% else %}false{% endif %};
+
         document.getElementById('panelActions').innerHTML = `
         <button class="btn btn-primary" onclick="openOrderUI()">📋 إضافة طلب</button>
-        <button class="btn btn-success" onclick="showPaymentModal(${session.id}, ${session.total_amount})">💰 دفع</button>
+        <button class="btn btn-success" onclick="showPaymentModal(${session.id}, ${displayTotal.toFixed(2)})">💰 دفع</button>
         <button class="btn btn-info" onclick="showMergeModal(${session.id})">🔗 دمج</button>
+        <button class="btn btn-secondary" onclick="showTransferModal(${session.id})">🔄 تشفيت</button>
         <button class="btn btn-ghost" onclick="showActivityModal(${session.id})">🎮 نشاط</button>
+        ${isOwnerOrManager ? `<button class="btn btn-warning" onclick="showPercentageModal(${session.id}, ${displayTotal.toFixed(2)})">📊 نسبة</button>` : ''}
     `;
     }
 
     // ===== ORDER CREATION =====
     let orderCart = {};
+    let isTakeawayMode = false;
 
     // ===== NEW SPLIT-PANE ORDER UI =====
     let fullMenuData = null;
@@ -543,6 +564,10 @@
         orderCart = {};
         window._productData = {};
         
+        // Update header based on mode
+        const panelHeader = document.querySelector('#orderPanel .panel-header h3');
+        panelHeader.textContent = isTakeawayMode ? '🛍️ طلب تيك أواي' : '📋 إضافة طلب جديد';
+
         // Auto-focus search on desktop
         setTimeout(() => document.getElementById('productSearch').focus(), 300);
 
@@ -554,9 +579,15 @@
         renderOrderUI();
     }
 
+    function openTakeawayOrder() {
+        isTakeawayMode = true;
+        openOrderUI();
+    }
+
     function closeOrderPanel() {
         document.getElementById('orderOverlay').classList.remove('active');
         document.getElementById('orderPanel').classList.remove('active');
+        isTakeawayMode = false;
     }
 
     function renderOrderUI() {
@@ -731,18 +762,32 @@
             return;
         }
 
-        const result = await apiPost('/api/orders/create/', {
-            table_uuid: currentTableUuid,
-            items: items,
-            is_from_qr: false,
-        });
-
-        if (result.success) {
-            showToast('تم إرسال الطلب بنجاح ✓');
-            closeOrderPanel();
-            loadSessionDetails(currentTableId);
+        if (isTakeawayMode) {
+            // Takeaway order
+            const result = await apiPost('/api/orders/create/', {
+                items: items,
+                is_takeaway: true,
+            });
+            if (result.success) {
+                showToast(result.message || 'تم إنشاء طلب تيك أواي بنجاح 🛍️');
+                closeOrderPanel();
+            } else {
+                showToast(result.error || 'خطأ في إنشاء الطلب', 'error');
+            }
         } else {
-            showToast(result.error || 'خطأ في إنشاء الطلب', 'error');
+            // Normal table order
+            const result = await apiPost('/api/orders/create/', {
+                table_uuid: currentTableUuid,
+                items: items,
+                is_from_qr: false,
+            });
+            if (result.success) {
+                showToast('تم إرسال الطلب بنجاح ✓');
+                closeOrderPanel();
+                loadSessionDetails(currentTableId);
+            } else {
+                showToast(result.error || 'خطأ في إنشاء الطلب', 'error');
+            }
         }
     }
 
@@ -818,6 +863,81 @@
         document.getElementById('modalOverlay').classList.add('active');
     }
 
+    function showPercentageModal(sessionId, total) {
+        total = parseFloat(total);
+        document.getElementById('modalTitle').textContent = '📊 إضافة نسبة على الفاتورة';
+        document.getElementById('modalBody').innerHTML = `
+        <div class="stat-card mb-2" style="justify-content:center;">
+            <div class="text-center">
+                <div class="stat-value text-success">${total.toFixed(2)} ج.م</div>
+                <div class="stat-label">الإجمالي الحالي</div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">النسبة المئوية (%)</label>
+            <input type="number" id="percentageInput" value="0" step="1" class="form-control" 
+                   placeholder="مثال: 10 لزيادة 10%، أو -15 لخصم 15%"
+                   oninput="updatePercentagePreview(${total})">
+            <small class="text-muted">أدخل رقم موجب للزيادة أو سالب للخصم</small>
+        </div>
+        <div class="stat-card mb-2" style="justify-content:center; background:rgba(var(--success-rgb),0.1);">
+            <div class="text-center">
+                <div id="adjustedAmount" class="stat-value" style="font-size:1.3rem;">0.00 ج.م</div>
+                <div class="stat-label">قيمة التعديل</div>
+            </div>
+        </div>
+        <div class="stat-card mb-2" style="justify-content:center;">
+            <div class="text-center">
+                <div id="newTotal" class="stat-value text-primary" style="font-size:1.5rem;">${total.toFixed(2)} ج.م</div>
+                <div class="stat-label">الإجمالي المتوقع</div>
+            </div>
+        </div>
+        <button class="btn btn-success btn-block btn-lg" onclick="applyPercentage(${sessionId}, ${total})">
+            ✨ تطبيق النسبة
+        </button>
+        `;
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+        // Auto-focus
+        setTimeout(() => document.getElementById('percentageInput').focus(), 200);
+    }
+
+    function updatePercentagePreview(baseTotal) {
+        const pct = parseFloat(document.getElementById('percentageInput').value) || 0;
+        const adjustAmount = baseTotal * (pct / 100);
+        const newTotal = baseTotal + adjustAmount;
+        document.getElementById('adjustedAmount').textContent = `${adjustAmount >= 0 ? '+' : ''}${adjustAmount.toFixed(2)} ج.م`;
+        document.getElementById('adjustedAmount').style.color = adjustAmount >= 0 ? 'var(--success)' : 'var(--danger)';
+        document.getElementById('newTotal').textContent = `${newTotal.toFixed(2)} ج.م`;
+    }
+
+    async function applyPercentage(sessionId, baseTotal) {
+        const pct = parseFloat(document.getElementById('percentageInput').value) || 0;
+        if (pct === 0) {
+            closeModal();
+            return;
+        }
+        
+        showToast('جاري تطبيق النسبة...', 'info');
+        const result = await apiPost(`/api/sessions/${sessionId}/add-percentage/`, { 
+            percentage: pct, 
+            total: baseTotal 
+        });
+        
+        if (result.success) {
+            showToast('تم إضافة النسبة بنجاح', 'success');
+            closeModal();
+            if (openPanelSessionId === sessionId) {
+                // Refresh panel
+                const tableId = document.querySelector(`.table-card[data-table-id]`).getAttribute('data-table-id'); // Approximation
+                // Best just to reload or close panel, a full reload is safest for now
+                setTimeout(() => location.reload(), 800);
+            }
+        } else {
+            showToast(result.error || 'حدث خطأ', 'error');
+        }
+    }
+
     function showMergeModal(sessionId) {
         document.getElementById('modalTitle').textContent = 'دمج طاولة';
         document.getElementById('modalBody').innerHTML = `
@@ -858,6 +978,91 @@
         }
     }
 
+    let _transferAllTables = [];
+
+    function showTransferModal(sessionId) {
+        document.getElementById('modalTitle').textContent = 'تشفيت للطاولة (نقل الجلسة)';
+        
+        let htmlContent = `
+        <p class="text-muted mb-2">اختر الطاولة المراد النقل إليها:</p>
+        <div class="floor-tabs" id="transferFloorTabs" style="margin-bottom: 15px;">
+            <!-- Floors will be loaded here -->
+        </div>
+        <div id="transferTablesGrid" class="tables-grid" style="grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); max-height: 50vh; overflow-y: auto;">
+            جارٍ التحميل...
+        </div>`;
+        
+        document.getElementById('modalBody').innerHTML = htmlContent;
+        document.getElementById('modalFooter').innerHTML = '';
+        document.getElementById('modalOverlay').classList.add('active');
+
+        // Load empty tables
+        apiGet('/api/tables/status/').then(data => {
+            _transferAllTables = [];
+            let tabsHtml = `<button class="floor-tab active" onclick="filterTransferTables('all', this)">الكل</button>`;
+            
+            data.floors.forEach(floor => {
+                let hasEmpty = false;
+                floor.tables.forEach(t => {
+                    if (t.status === 'empty') {
+                        _transferAllTables.push({...t, floor_id: floor.id, floor_name: floor.name});
+                        hasEmpty = true;
+                    }
+                });
+                
+                if (hasEmpty) {
+                    tabsHtml += `<button class="floor-tab" onclick="filterTransferTables(${floor.id}, this)">${floor.name}</button>`;
+                }
+            });
+            
+            document.getElementById('transferFloorTabs').innerHTML = tabsHtml;
+            renderTransferTables('all', sessionId);
+        });
+    }
+
+    function filterTransferTables(floorId, tabElement) {
+        // Update active tab style
+        const tabs = document.getElementById('transferFloorTabs').querySelectorAll('.floor-tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        tabElement.classList.add('active');
+        
+        // Ensure we pass the active session ID when rendering
+        renderTransferTables(floorId, currentSessionId);
+    }
+
+    function renderTransferTables(floorId, sessionId) {
+        let html = '';
+        const filteredTables = floorId === 'all' 
+            ? _transferAllTables 
+            : _transferAllTables.filter(t => t.floor_id === (typeof floorId === 'string' ? parseInt(floorId) : floorId));
+            
+        filteredTables.forEach(t => {
+            html += `
+            <div class="table-card" data-status="empty" style="aspect-ratio:1;cursor:pointer;"
+                 onclick="transferSession(${sessionId}, ${t.id})">
+                <div class="table-number" style="font-size:1.3rem;">${t.number}</div>
+                <div class="table-name" style="font-size:0.7rem;">${t.display_name || t.name}</div>
+                ${floorId === 'all' ? `<div style="font-size:0.6rem; color:var(--text-muted); margin-top:4px;">${t.floor_name}</div>` : ''}
+            </div>
+            `;
+        });
+        
+        document.getElementById('transferTablesGrid').innerHTML = html || '<p class="text-muted">لا توجد طاولات فارغة متاحة للنقل في هذا الدور</p>';
+    }
+
+    async function transferSession(sessionId, tableId) {
+        if (!confirm('هل أنت متأكد من نقل كل محتويات هذه الجلسة إلى الطاولة المحددة؟')) return;
+        
+        const result = await apiPost(`/api/sessions/${sessionId}/transfer/`, { table_id: tableId });
+        if (result.success) {
+            showToast('تم نقل الجلسة بنجاح 🔄');
+            closeModal();
+            location.reload();
+        } else {
+            showToast(result.error || 'حدث خطأ أثناء النقل', 'error');
+        }
+    }
+
     function showActivityModal(sessionId) {
         document.getElementById('modalTitle').textContent = 'بدء نشاط';
         document.getElementById('modalBody').innerHTML = 'جارٍ التحميل...';
@@ -879,13 +1084,13 @@
                 at.devices.forEach(d => {
                     const isAvailable = d.status === 'available';
                     html += `
-                    <div class="card mb-1" style="padding:12px;opacity:${isAvailable ? 1 : 0.5};">
+                    <div class="card mb-1" style="padding:12px; border-right: 4px solid ${isAvailable ? 'var(--success)' : 'var(--danger)'};">
                         <div class="d-flex align-center justify-between">
-                            <span>${d.name}</span>
-                            ${isAvailable ?
-                            `<button class="btn btn-success btn-sm" onclick="startActivity(${d.id}, ${sessionId})">تشغيل</button>` :
-                            `<span class="badge badge-danger">${d.status_display}</span>`
-                        }
+                            <div>
+                                <span class="fw-bold">${d.name}</span>
+                                <div class="text-muted" style="font-size:0.8rem;">${d.status_display}</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="startActivity(${d.id}, ${sessionId})">➕ إضافة للطابور</button>
                         </div>
                     </div>
                 `;
@@ -898,9 +1103,12 @@
     async function startActivity(deviceId, sessionId) {
         const result = await apiPost('/api/activities/start/', { device_id: deviceId, session_id: sessionId });
         if (result.success) {
-            showToast('تم تشغيل النشاط');
+            showToast('تمت الإضافة للطابور بنجاح 📋');
             closeModal();
-            loadSessionDetails(currentTableId);
+            // Redirect to queue page after a short delay
+            setTimeout(() => {
+                window.location.href = '/queue/';
+            }, 1000);
         } else {
             showToast(result.error || 'خطأ', 'error');
         }

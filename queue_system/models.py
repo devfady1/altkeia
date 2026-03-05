@@ -21,10 +21,22 @@ class QueueEntry(models.Model):
         null=True, blank=True,
         verbose_name='الجلسة'
     )
+    activity_session = models.OneToOneField(
+        'activities.ActivitySession', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='queue_entry',
+        verbose_name='جلسة النشاط'
+    )
     table = models.ForeignKey(
         'tables.Table', on_delete=models.SET_NULL,
         null=True, blank=True,
         verbose_name='الطاولة'
+    )
+    device = models.ForeignKey(
+        'activities.Device', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='queue_entries',
+        verbose_name='الجهاز المطلوب'
     )
     customer_name = models.CharField(max_length=100, blank=True, verbose_name='اسم العميل')
     requested_hours = models.DecimalField(max_digits=4, decimal_places=1, default=1, verbose_name='عدد الساعات')

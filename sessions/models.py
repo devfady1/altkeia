@@ -15,7 +15,8 @@ class TableSession(models.Model):
     tables = models.ManyToManyField(Table, related_name='sessions_set', verbose_name='الطاولات')
     primary_table = models.ForeignKey(
         Table, on_delete=models.CASCADE,
-        related_name='primary_sessions', verbose_name='الطاولة الرئيسية'
+        related_name='primary_sessions', verbose_name='الطاولة الرئيسية',
+        null=True, blank=True
     )
     status = models.CharField(
         max_length=20,
@@ -44,7 +45,8 @@ class TableSession(models.Model):
         ordering = ['-opened_at']
 
     def __str__(self):
-        return f"جلسة #{self.pk} - {self.primary_table}"
+        table_name = self.primary_table if self.primary_table else 'بدون طاولة'
+        return f"جلسة #{self.pk} - {table_name}"
 
     def calculate_total(self):
         """حساب الإجمالي"""
@@ -72,13 +74,25 @@ class TableSession(models.Model):
         self.closed_at = timezone.now()
         self.save()
         # تحرير الطاولات
-        self.tables.all().update(status=Table.Status.EMPTY)
+        if self.tables.exists():
+            self.tables.all().update(status=Table.Status.EMPTY)
 
     def merge_table(self, table):
         """دمج طاولة أخرى في الجلسة"""
         self.tables.add(table)
         table.status = Table.Status.OCCUPIED
         table.save()
+
+    @property
+    def total_paid(self):
+        """إجمالي المبالغ المدفوعة"""
+        from django.db.models import Sum
+        return self.payments.aggregate(Sum('amount'))['amount__sum'] or 0
+
+    @property
+    def remaining_amount(self):
+        """المبلغ المتبقي"""
+        return self.total_amount - self.total_paid
 
     @property
     def duration(self):

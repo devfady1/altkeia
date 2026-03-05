@@ -54,7 +54,7 @@
             {% for s in sessions %}
             <tr>
                 <td>{{ s.pk }}</td>
-                <td>{{ s.primary_table.display_name }}</td>
+                <td>{{ s.primary_table.display_name|default:"بدون طاولة" }}</td>
                 <td>{{ s.opened_at|time:"H:i" }} - {{ s.closed_at|time:"H:i" }}</td>
                 <td class="text-success fw-bold">{{ s.total_amount }} ج.م</td>
             </tr>

@@ -14,8 +14,11 @@
         
         <form method="get" class="d-flex gap-1">
             <select name="shift_id" class="form-control" style="width: 250px;" onchange="this.form.submit()">
+                <option value="none" {% if selected_shift == None %}selected{% endif %}>
+                    فواتير بدون شيفت ⚠️
+                </option>
                 {% for s in recent_shifts %}
-                    <option value="{{ s.id }}" {% if selected_shift.id == s.id %}selected{% endif %}>
+                    <option value="{{ s.id }}" {% if selected_shift and selected_shift.id == s.id %}selected{% endif %}>
                         شيفت #{{ s.id }} - {{ s.started_at|date:"Y-m-d h:i A" }}
                         {% if s.is_active %}(نشط حالياً){% endif %}
                     </option>
@@ -25,31 +28,51 @@
         </form>
     </div>
 
-    {% if selected_shift %}
+    {% if selected_shift or selected_shift == None %}
     <div class="grid grid-cols-4 mb-3" style="gap: 15px;">
         <div class="card p-2 text-center">
             <div class="text-muted small">إجمالي الإيراد</div>
-            <div class="h3 fw-bold text-success">{{ selected_shift.total_revenue|floatformat:2 }} ج.م</div>
+            {% if selected_shift %}
+                <div class="h3 fw-bold text-success">{{ selected_shift.total_revenue|floatformat:2 }} ج.م</div>
+            {% else %}
+                <div class="h3 fw-bold text-success">{{ payments|sum_amounts|floatformat:2 }} ج.م</div>
+            {% endif %}
         </div>
         <div class="card p-2 text-center">
             <div class="text-muted small">عدد الفواتير</div>
-            <div class="h3 fw-bold">{{ payments.count }}</div>
+            <div class="h3 fw-bold">{{ payments.count|default:"0" }}</div>
         </div>
         <div class="card p-2 text-center">
             <div class="text-muted small">إجمالي الخصم</div>
-            <div class="h3 fw-bold text-danger">{{ selected_shift.total_discount|floatformat:2 }} ج.m</div>
+            {% if selected_shift %}
+                <div class="h3 fw-bold text-danger">{{ selected_shift.total_discount|floatformat:2 }} ج.م</div>
+            {% else %}
+                <div class="h3 fw-bold text-danger">{{ payments|sum_discounts|floatformat:2 }} ج.م</div>
+            {% endif %}
         </div>
         <div class="card p-2 text-center">
             <div class="text-muted small">حالة الشيفت</div>
             <div class="h3 fw-bold">
-                {% if selected_shift.is_active %}
-                <span class="badge badge-success">نشط</span>
+                {% if selected_shift %}
+                    {% if selected_shift.is_active %}
+                    <span class="badge badge-success">نشط</span>
+                    {% else %}
+                    <span class="badge badge-secondary">مغلق</span>
+                    {% endif %}
                 {% else %}
-                <span class="badge badge-secondary">مغلق</span>
+                    <span class="badge badge-warning">بدون شيفت</span>
                 {% endif %}
             </div>
         </div>
     </div>
+
+    {% if selected_shift %}
+    <div class="mb-3 d-flex justify-end">
+        <button class="btn btn-primary" onclick="printShiftFullReport({{ selected_shift.id }})">
+            🖨️ طباعة تقرير الشيفت كامل (5 ريسيت)
+        </button>
+    </div>
+    {% endif %}
 
     <div class="card overflow-hidden">
         <table class="table">
@@ -70,7 +93,7 @@
                 {% for p in payments %}
                 <tr>
                     <td><span class="fw-bold">#{{ p.shift_invoice_number|default:p.id }}</span></td>
-                    <td>{{ p.session.primary_table.display_name }}</td>
+                    <td>{{ p.session.primary_table.display_name|default:"بدون طاولة" }}</td>
                     <td>{{ p.paid_at|date:"h:i A" }}</td>
                     <td>{{ p.paid_by.username }}</td>
                     <td>{{ p.amount|floatformat:2 }}</td>
@@ -84,12 +107,17 @@
                         {% endif %}
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-ghost" onclick="window.printReceipt({{ p.id }})">🖨️</button>
-                        {% if p.session.orders.exists %}
+                        <button class="btn btn-sm btn-ghost" onclick="window.printReceipt({{ p.id }})" title="طباعة">🖨️</button>
+                        {% if p.session and p.session.orders.exists %}
                             <button class="btn btn-sm btn-primary" 
                                     data-session-id="{{ p.session.id }}"
                                     data-items="{{ p.session|session_items_json|escape }}"
                                     onclick="openEditModal(this)">📝 تعديل</button>
+                        {% endif %}
+                        {% if p.amount > 0 %}
+                            <button class="btn btn-sm btn-danger" onclick="cancelInvoice({{ p.id }}, '{{ p.shift_invoice_number|default:p.id }}')" title="إلغاء وجعل الفاتورة مرتجع">🔙 مرتجع</button>
+                        {% else %}
+                            <span class="badge badge-danger">مرتجع</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -116,6 +144,32 @@ window.printReceipt = function(paymentId) {
         if(res.success) showToast('تمت الطباعة');
         else showToast(res.error || 'خطأ في الطباعة', 'error');
     });
+}
+
+window.printShiftFullReport = function(shiftId) {
+    showToast('جاري إرسال أمر طباعة تقرير الشيفت...', 'success');
+    apiPost(`/reports/shift/${shiftId}/print/`).then(res => {
+        if(res.success) showToast(res.message || 'تمت الطباعة');
+        else showToast(res.error || 'خطأ في الطباعة', 'error');
+    });
+}
+
+window.cancelInvoice = function(paymentId, invoiceNumber) {
+    const confirmPrompt = prompt(`تأكيد الإلغاء: هل أنت متأكد من إلغاء الفاتورة بالكامل وجعلها مرتجع؟\nإذا كنت متأكد، اكتب رقم الفاتورة (${invoiceNumber}) للتأكيد:`);
+    
+    if (confirmPrompt === String(invoiceNumber)) {
+        showToast('جاري تحويل الفاتورة لمرتجع...', 'info');
+        apiPost(`/api/payments/${paymentId}/cancel/`).then(res => {
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(res.error || 'خطأ في العملية', 'error');
+            }
+        });
+    } else if (confirmPrompt !== null) {
+        showToast('رقم الفاتورة غير صحيح، تم إلغاء العملية.', 'error');
+    }
 }
 
 let currentEditSessionId = null;

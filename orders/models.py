@@ -18,11 +18,13 @@ class Order(models.Model):
 
     session = models.ForeignKey(
         TableSession, on_delete=models.CASCADE,
-        related_name='orders', verbose_name='الجلسة'
+        related_name='orders', verbose_name='الجلسة',
+        null=True, blank=True
     )
     table = models.ForeignKey(
         Table, on_delete=models.CASCADE,
-        related_name='orders', verbose_name='الطاولة'
+        related_name='orders', verbose_name='الطاولة',
+        null=True, blank=True
     )
     status = models.CharField(
         max_length=20,
@@ -41,6 +43,7 @@ class Order(models.Model):
     )
     notes = models.TextField(blank=True, verbose_name='ملاحظات')
     is_from_qr = models.BooleanField(default=False, verbose_name='من QR')
+    is_takeaway = models.BooleanField(default=False, verbose_name='تيك أواي')
     shift = models.ForeignKey(
         'reports.CashierShift',
         on_delete=models.SET_NULL,
@@ -59,6 +62,8 @@ class Order(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
+        if self.is_takeaway:
+            return f"طلب تيك أواي #{self.pk}"
         return f"طلب #{self.pk} - {self.table}"
 
     @property
@@ -81,7 +86,8 @@ class Order(models.Model):
 class OrderItem(models.Model):
     """عنصر في الطلب"""
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items', verbose_name='الطلب')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name='المنتج')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True, verbose_name='المنتج')
+    label = models.CharField(max_length=200, blank=True, verbose_name='وصف مخصص')
     size = models.ForeignKey(
         ProductSize, on_delete=models.SET_NULL,
         null=True, blank=True,
@@ -106,12 +112,16 @@ class OrderItem(models.Model):
 
     @property
     def display_name(self):
+        if self.label:
+            return self.label
+        if not self.product:
+            return self.label or 'عنصر'
         if self.size_name:
             return f"{self.product.name} ({self.size_name})"
         return self.product.name
 
     def save(self, *args, **kwargs):
-        if not self.price:
+        if not self.price and self.product:
             if self.size:
                 self.price = self.size.price
             else:
