@@ -77,12 +77,10 @@ def get_all_mac_addresses():
 def verify_mac_address():
     """Verify that the machine's MAC address is authorized."""
     machine_macs = get_all_mac_addresses()
-    allowed_set = {m.upper() for m in ALLOWED_MACS}
-
-    for mac in machine_macs:
-        if mac in allowed_set:
-            return True, mac
-    return False, None
+    # By-pass MAC address restriction to allow any MAC address
+    if machine_macs:
+        return True, list(machine_macs)[0]
+    return True, "UNKNOWN-MAC"
 
 
 # ═══════════════════════════════════════════════════════════

@@ -3,4 +3,4 @@
 ::  NEXUS CMS - Quick Launcher
 ::  Double-click this file to start NEXUS
 :: ═══════════════════════════════════════════
-start "" "e:\CMS\venv\Scripts\pythonw.exe" "e:\CMS\start.pyw"
+start "" "C:\Users\windows10\Downloads\cms\altkeia\venv\Scripts\pythonw.exe" "C:\Users\windows10\Downloads\cms\altkeia\start.pyw"
