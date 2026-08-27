@@ -36,7 +36,7 @@ BROWSER_URL = "http://localhost:8000"
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-VENV_PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
+VENV_PYTHON = "python"
 MANAGE_PY = os.path.join(BASE_DIR, "manage.py")
 
 
