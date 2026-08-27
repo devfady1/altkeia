@@ -32,12 +32,45 @@ ALLOWED_MACS = [
 # Server settings
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = "8000"
-BROWSER_URL = "http://localhost:8000"
+BROWSER_URL = "http://localhost:8000"  # Will be updated dynamically
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = "python"
 MANAGE_PY = os.path.join(BASE_DIR, "manage.py")
+
+
+# ═══════════════════════════════════════════════════════════
+# NETWORK UTILITIES
+# ═══════════════════════════════════════════════════════════
+
+def get_local_ip():
+    """Get the local network IP address of this machine."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def open_firewall_port():
+    """Open port 8000 in Windows Firewall so LAN devices can connect."""
+    try:
+        subprocess.run(
+            [
+                "netsh", "advfirewall", "firewall", "add", "rule",
+                "name=NEXUS CMS Port 8000",
+                "dir=in", "action=allow",
+                "protocol=TCP", "localport=8000"
+            ],
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except Exception:
+        pass
 
 
 # ═══════════════════════════════════════════════════════════
@@ -162,6 +195,17 @@ def show_splash_screen(authorized_mac):
     )
     security_label.pack()
 
+    # Network URL label
+    local_ip = get_local_ip()
+    network_label = tk.Label(
+        info_frame,
+        text=f"🌐  Network URL: http://{local_ip}:8000",
+        font=("Consolas", 9),
+        fg="#ffaa00",
+        bg="#0a0a1a"
+    )
+    network_label.pack(pady=(3, 0))
+
     # Loading status
     status_var = tk.StringVar(value="⚡  Starting server...")
     status_label = tk.Label(
@@ -273,7 +317,11 @@ def open_browser_fullscreen():
 def main():
     """Main launcher entry point."""
 
-    # ── Step 1: MAC Address Verification ──
+    # ── Step 1: Detect local IP & open Firewall ──
+    local_ip = get_local_ip()
+    open_firewall_port()
+
+    # ── Step 2: MAC Address Verification ──
     authorized, mac = verify_mac_address()
     if not authorized:
         root = tk.Tk()
@@ -288,12 +336,12 @@ def main():
         root.destroy()
         sys.exit(1)
 
-    # ── Step 2: Show Splash Screen ──
+    # ── Step 3: Show Splash Screen ──
     splash, status_var, progress_bar, progress_frame = show_splash_screen(mac)
     splash.update()
     time.sleep(0.5)
 
-    # ── Step 3: Start Django Server ──
+    # ── Step 4: Start Django Server ──
     animate_progress(splash, progress_bar, progress_frame, 20)
     status_var.set("⚡  Starting Django server...")
     splash.update()
@@ -335,15 +383,18 @@ def main():
     time.sleep(0.5)
 
     animate_progress(splash, progress_bar, progress_frame, 100)
-    status_var.set("🚀  NEXUS is ready!")
+    status_var.set(f"🚀  NEXUS is ready!  │  LAN: http://{local_ip}:8000")
     splash.update()
     time.sleep(0.5)
 
     # Close splash
     splash.destroy()
 
-    # Open browser and send F11
-    open_browser_fullscreen()
+    # Open browser using local IP (works for LAN too) and send F11
+    webbrowser.open(f"http://{local_ip}:8000")
+    f11_thread = threading.Thread(target=send_f11, daemon=True)
+    f11_thread.start()
+    f11_thread.join(timeout=5)
 
 
 if __name__ == "__main__":
