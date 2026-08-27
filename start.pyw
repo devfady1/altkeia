@@ -32,6 +32,7 @@ ALLOWED_MACS = [
 # Server settings
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = "8000"
+CUSTOM_DOMAIN = "altekia.fady"  # Custom LAN domain
 BROWSER_URL = "http://localhost:8000"  # Will be updated dynamically
 
 # Paths
@@ -57,20 +58,117 @@ def get_local_ip():
 
 
 def open_firewall_port():
-    """Open port 8000 in Windows Firewall so LAN devices can connect."""
+    """Open ports 8000 and 53 in Windows Firewall so LAN devices can connect."""
+    for port, proto, name in [
+        ("8000", "TCP", "NEXUS CMS Port 8000"),
+        ("53",   "UDP", "NEXUS CMS DNS Port 53"),
+    ]:
+        try:
+            subprocess.run(
+                [
+                    "netsh", "advfirewall", "firewall", "add", "rule",
+                    f"name={name}",
+                    "dir=in", "action=allow",
+                    f"protocol={proto}", f"localport={port}"
+                ],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        except Exception:
+            pass
+
+
+# ═══════════════════════════════════════════════════════════
+# MINI DNS SERVER
+# ═══════════════════════════════════════════════════════════
+
+def _parse_dns_domain(data):
+    """Extract domain name from a raw DNS query packet."""
     try:
-        subprocess.run(
-            [
-                "netsh", "advfirewall", "firewall", "add", "rule",
-                "name=NEXUS CMS Port 8000",
-                "dir=in", "action=allow",
-                "protocol=TCP", "localport=8000"
-            ],
-            capture_output=True,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
+        offset = 12
+        labels = []
+        while offset < len(data):
+            length = data[offset]
+            if length == 0:
+                break
+            offset += 1
+            labels.append(data[offset:offset + length].decode('utf-8', errors='ignore'))
+            offset += length
+        return '.'.join(labels).lower()
+    except Exception:
+        return ''
+
+
+def _build_dns_response(query, ip):
+    """Build a DNS A-record response pointing to the given IP."""
+    try:
+        resp = bytearray(query[:2])          # transaction ID
+        resp += b'\x84\x00'                  # flags: QR=1, AA=1, RCODE=0
+        resp += query[4:6]                    # QDCOUNT
+        resp += b'\x00\x01'                  # ANCOUNT = 1
+        resp += b'\x00\x00\x00\x00'          # NSCOUNT, ARCOUNT
+        # Question section (copy from query)
+        q_start = 12
+        q_end = q_start
+        while q_end < len(query) and query[q_end] != 0:
+            q_end += 1 + query[q_end]
+        q_end += 5  # null + QTYPE + QCLASS
+        resp += query[q_start:q_end]
+        # Answer section
+        resp += b'\xc0\x0c'                  # pointer to question name
+        resp += b'\x00\x01'                  # type A
+        resp += b'\x00\x01'                  # class IN
+        resp += b'\x00\x00\x00\x3c'          # TTL 60 s
+        resp += b'\x00\x04'                  # RDLENGTH
+        resp += bytes(int(x) for x in ip.split('.'))
+        return bytes(resp)
+    except Exception:
+        return None
+
+
+def _forward_dns(data, upstream='8.8.8.8'):
+    """Forward a DNS query to an upstream server and return the response."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.sendto(data, (upstream, 53))
+        resp, _ = s.recvfrom(512)
+        s.close()
+        return resp
+    except Exception:
+        return None
+
+
+def _dns_server_loop(local_ip, domain):
+    """Main loop of the mini DNS server."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', 53))
+        sock.settimeout(1)
+        while True:
+            try:
+                data, addr = sock.recvfrom(512)
+                queried = _parse_dns_domain(data)
+                if queried == domain.lower():
+                    resp = _build_dns_response(data, local_ip)
+                else:
+                    resp = _forward_dns(data)
+                if resp:
+                    sock.sendto(resp, addr)
+            except socket.timeout:
+                continue
+            except Exception:
+                continue
     except Exception:
         pass
+
+
+def start_dns_server(local_ip, domain=CUSTOM_DOMAIN):
+    """Start the mini DNS server in a background daemon thread."""
+    t = threading.Thread(target=_dns_server_loop, args=(local_ip, domain), daemon=True)
+    t.start()
+    return t
 
 
 # ═══════════════════════════════════════════════════════════
@@ -195,16 +293,25 @@ def show_splash_screen(authorized_mac):
     )
     security_label.pack()
 
-    # Network URL label
+    # Network URL label - custom domain
     local_ip = get_local_ip()
     network_label = tk.Label(
         info_frame,
-        text=f"🌐  Network URL: http://{local_ip}:8000",
-        font=("Consolas", 9),
+        text=f"DNS: http://{CUSTOM_DOMAIN}:8000",
+        font=("Consolas", 9, "bold"),
         fg="#ffaa00",
         bg="#0a0a1a"
     )
     network_label.pack(pady=(3, 0))
+
+    dns_hint = tk.Label(
+        info_frame,
+        text=f"(Set phone DNS to: {get_local_ip()})",
+        font=("Consolas", 8),
+        fg="#555555",
+        bg="#0a0a1a"
+    )
+    dns_hint.pack()
 
     # Loading status
     status_var = tk.StringVar(value="⚡  Starting server...")
@@ -317,9 +424,10 @@ def open_browser_fullscreen():
 def main():
     """Main launcher entry point."""
 
-    # ── Step 1: Detect local IP & open Firewall ──
+    # -- Step 1: Detect local IP, open Firewall & start DNS server --
     local_ip = get_local_ip()
     open_firewall_port()
+    start_dns_server(local_ip, CUSTOM_DOMAIN)
 
     # ── Step 2: MAC Address Verification ──
     authorized, mac = verify_mac_address()
