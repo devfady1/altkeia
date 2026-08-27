@@ -339,6 +339,7 @@
     }
 
     function showEmptyTablePanel(tableId, tableName) {
+        currentSessionId = null;
         document.getElementById('panelBody').innerHTML = `
         <div style="text-align:center;padding:40px 0;">
             <div style="font-size:3rem;margin-bottom:16px;">🪑</div>
@@ -401,6 +402,8 @@
     async function loadSessionDetails(tableId) {
         const body = document.getElementById('panelBody');
         body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="text-muted">جارٍ التحميل...</div></div>';
+        document.getElementById('panelTotal').textContent = '0 ج.م';
+        document.getElementById('panelActions').innerHTML = '';
 
         try {
             const res = await fetch(`/api/sessions/by-table/${tableId}/`);
@@ -411,21 +414,37 @@
             } else if (res.status === 404) {
                 const errData = await res.json();
                 console.error('Session Error:', errData);
+                
+                // If backend says it's actually empty, gracefully recover
+                if (errData.table_status === 'empty') {
+                    const tableCard = document.querySelector(`.table-card[data-table-id="${tableId}"]`);
+                    if (tableCard) {
+                        tableCard.setAttribute('data-status', 'empty');
+                        const badge = tableCard.querySelector('.table-status-badge');
+                        if (badge) {
+                            badge.className = 'table-status-badge empty';
+                            badge.textContent = 'فارغة';
+                        }
+                    }
+                    showEmptyTablePanel(tableId, document.getElementById('panelTitle').textContent);
+                    return;
+                }
+
                 // If table is supposed to be occupied but no session found
                 body.innerHTML = `
                     <div style="text-align:center;padding:40px 0;">
                         <div style="font-size:3rem;margin-bottom:16px;">⚠️</div>
                         <p style="color:var(--danger);margin-bottom:10px;font-weight:bold;">خطأ: لم يتم العثور على جلسة نشطة</p>
                         <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:20px;">الطاولة مسجلة كـ "${errData.table_status || 'مشغولة'}" لكن لا توجد جلسة مرتبطة بها في النظام.</p>
-                        <button class="btn btn-warning btn-sm" onclick="showEmptyTablePanel(${tableId}, '')">🔄 عرض خيارات الطاولة الفارغة</button>
+                        <button class="btn btn-warning btn-sm" onclick="showEmptyTablePanel(${tableId}, document.getElementById('panelTitle').textContent)">🔄 عرض خيارات الطاولة الفارغة</button>
                     </div>
                 `;
             } else {
-                showEmptyTablePanel(tableId, '');
+                showEmptyTablePanel(tableId, document.getElementById('panelTitle').textContent);
             }
         } catch (e) {
             console.error('Fetch Error:', e);
-            showEmptyTablePanel(tableId, '');
+            showEmptyTablePanel(tableId, document.getElementById('panelTitle').textContent);
         }
     }
 
@@ -1184,7 +1203,9 @@
     // Auto refresh active panel every 10s
     setInterval(() => {
         if (document.getElementById('sidePanel').classList.contains('active') && currentTableId) {
-            loadSessionDetails(currentTableId);
+            if (currentSessionId) {
+                loadSessionDetails(currentTableId);
+            }
         }
     }, 10000);
 </script>
